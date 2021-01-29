@@ -2,3 +2,8 @@
 
 My personal, homebrew Arduino libraries,
 grouped into one repository for convenience.
+
+To make available to the Arduino IDE,
+symlink each subdirectory (~TOGoSStringView~, etc)
+into your Arduino libraries directory.
+On windows this is commonly ~C:/Users/Your.Name/Documents/Arduino/libraries/~.
