@@ -16,7 +16,7 @@ namespace TOGoS {
     StringView(const std::string& str) : _begin(str.data()), _size(str.size()) {}
     const char *begin() const { return this->_begin; }
     const char *end() const { return this->_begin + this->_size; }
-    const char operator[](size_t offset) const { return this->_begin[offset]; }
+    const char &operator[](size_t offset) const { return this->_begin[offset]; }
     size_t size() const { return this->_size; }
     operator std::string() const { return std::string(this->begin(), this->size()); }
     bool operator==(const StringView &other) const {
