@@ -3,7 +3,7 @@
 
 #include <TOGoSStringView.h>
 
-namespace TOGoS {
+namespace TOGoS { namespace Command {
   /** 'Text Line Input Buffer';
    * Buffers characters until a carriage return or newline is read,
    * at which point it switches to READY and the line can be read. */
@@ -32,6 +32,6 @@ namespace TOGoS {
     BufferState onChar(char c);
     StringView str() const;
   };
-}
+}}
 
 #endif

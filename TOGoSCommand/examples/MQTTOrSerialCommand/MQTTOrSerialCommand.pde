@@ -3,7 +3,9 @@
  * and also from MQTT!
  */
 
+#include <TOGoSStringView.h>
 #include <TOGoSCommand.h>
+#include <TOGoS/Command/TLIBuffer.h>
 #include <TOGoSStreamOperators.h>
 #include <Print.h>
 #include <ESP8266WiFi.h>
@@ -234,7 +236,9 @@ void processLine(const TOGoS::StringView& line) {
   }
 }
 
-TOGoS::TLIBuffer commandBuffer;
+using TLIBuffer = TOGoS::Command::TLIBuffer;
+
+TLIBuffer commandBuffer;
 
 void setup() {
   Serial.begin(115200);
@@ -248,8 +252,8 @@ void setup() {
 
 void loop() {
   while( Serial.available() > 0 ) {
-    TOGoS::TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
-    if( bufState == TOGoS::TLIBuffer::BufferState::READY ) {
+    TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
+    if( bufState == TLIBuffer::BufferState::READY ) {
       processLine( commandBuffer.str() );
       commandBuffer.reset();
     }

@@ -1,6 +1,6 @@
 #include "TLIBuffer.h"
 
-using TLIBuffer = TOGoS::TLIBuffer;
+using TLIBuffer = TOGoS::Command::TLIBuffer;
 using StringView = TOGoS::StringView;
 
 TLIBuffer::TLIBuffer() {
