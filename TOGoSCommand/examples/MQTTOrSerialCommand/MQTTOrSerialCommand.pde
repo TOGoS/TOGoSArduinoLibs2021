@@ -10,84 +10,18 @@
 #include <Print.h>
 #include <ESP8266WiFi.h>
 #include <vector>
+#include <TOGoS/Command/ParseError.h>
+#include <TOGoS/Command/ParseResult.h>
+#include <TOGoS/Command/TokenizedCommand.h>
 
-class TokenizedCommand {
-public:
-  const TOGoS::StringView path;
-  const TOGoS::StringView argStr;
-  const std::vector<TOGoS::StringView> args;
-
-  TokenizedCommand(const TOGoS::StringView& path, const TOGoS::StringView& argStr, const std::vector<TOGoS::StringView> args)
-    : path(path), argStr(argStr), args(args) { }
-  TokenizedCommand() {}
-
-  bool isEmpty() const {
-    return this->path.size() == 0;
-  }
-
-  static TokenizedCommand empty() {
-    //return TokenizedCommand(TOGoS::StringView(), TOGoS::StringView(), std::vector<TOGoS::StringView>());
-    return TokenizedCommand();
-  }
-};
-
-struct ParseError {
-  enum class ErrorCode {
-    NO_ERROR,
-    UNEXPECTED_BRACE,
-    UNEXPECTED_EOI,
-  } errorCode;
-  size_t errorOffset;
-  
-  const char *getErrorMessage() const {
-    switch( errorCode ) {
-    case ErrorCode::NO_ERROR: return "no error";
-    case ErrorCode::UNEXPECTED_BRACE: return "invalid brace";
-    case ErrorCode::UNEXPECTED_EOI: return "invalid end of input";
-    default: return "unknown parse error code";
-    }
-  }
-
-  ParseError(ErrorCode code, size_t offset) : errorCode(code), errorOffset(offset) {}
-  ParseError() : errorCode(ErrorCode::NO_ERROR), errorOffset(0) {};
-};
-
-template<typename T>
-class ParseResult {
-public:
-  T value;
-  ParseError error;
-protected:  
-  ParseResult(const T& value) : value(value) { }
-  ParseResult(T&& value) : value(std::move(value)) { }
-  ParseResult(ParseError error) : value(), error(error) { }
-public:
-  bool isError() const {
-    return error.errorCode != ParseError::ErrorCode::NO_ERROR;
-  }
-  static ParseResult errored(const ParseError& error) {
-    return ParseResult(error);
-  }
-  static ParseResult errored(ParseError::ErrorCode code, size_t offset) {
-    return ParseResult(ParseError(code, offset));
-  }
-  static ParseResult ok(const T &value) {
-    return ParseResult(value);
-  }
-  static ParseResult ok(T &&value) {
-    return ParseResult(std::move(value));
-  }
-};
-
-using TokenList = std::vector<TOGoS::StringView>;
-
-Print& operator<<(Print& printer, const ParseError& parseError) {
-  return printer << parseError.getErrorMessage() << " at index " << parseError.errorOffset;
-}
+using StringView = TOGoS::StringView;
+using TokenizedCommand = TOGoS::Command::TokenizedCommand;
+using ParseError = TOGoS::Command::ParseError;
+using TCPR = TOGoS::Command::ParseResult<TokenizedCommand>;
 
 Print& operator<<(Print& printer, const TokenizedCommand &cmd) {
   printer << "path:" << cmd.path;
-  
+
   if( cmd.argStr.size() > 0 ) {
     printer << " cmdArgs:" << cmd.argStr;
   }
@@ -100,85 +34,13 @@ Print& operator<<(Print& printer, const TokenizedCommand &cmd) {
   return printer;
 }
 
-static bool isWhitespace(char c) {
-  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+
+Print& operator<<(Print& printer, const ParseError& parseError) {
+  return printer << parseError.getErrorMessage() << " at index " << parseError.errorOffset;
 }
 
-ParseResult<TokenList> parseList(const TOGoS::StringView& readFrom, size_t index0) {
-  const char *cur = readFrom.begin();
-  const char *end = readFrom.end();
-  TokenList arge;
 
-  using Result = ParseResult<TokenList>;
-  
-  enum class ParseState {
-                         BETWEEN,
-                         BARE,
-                         BRACED,
-  } state = ParseState::BETWEEN;
-  const char *currentWordBegin = 0; // If null, no 'word begin' has been found
-  int braceDepth = 0;
-  
-  while( true ) {
-    switch( state ) {
-    case ParseState::BETWEEN:
-      if( cur == end ) goto end_of_input;
-      if( isWhitespace(*cur) ) break;
-      switch( *cur ) {
-      case '#':
-        goto end_of_input;
-      case '{':
-        braceDepth = 1;
-        state = ParseState::BRACED;
-        currentWordBegin = cur+1;
-        break;
-      default:
-        state = ParseState::BARE;
-        currentWordBegin = cur;
-        break;
-      }
-      break;
-    case ParseState::BARE:
-      if( cur == end ) {
-        arge.emplace_back(currentWordBegin, cur - currentWordBegin);
-        goto end_of_input;
-      }
-      if( isWhitespace(*cur) ) {
-        arge.emplace_back(currentWordBegin, cur - currentWordBegin);
-        state = ParseState::BETWEEN;
-        break;
-      }
-      switch( *cur ) {
-      case '{':
-        return Result::errored(ParseError::ErrorCode::UNEXPECTED_BRACE, index0 + (cur - readFrom.begin()));
-      case '}':
-        return Result::errored(ParseError::ErrorCode::UNEXPECTED_BRACE, index0 + (cur - readFrom.begin()));
-      }
-      break;
-    case ParseState::BRACED:
-      if( cur == end ) return Result::errored(ParseError::ErrorCode::UNEXPECTED_EOI, index0 + (cur - readFrom.begin()));
-      switch( *cur ) {
-      case '{':
-        ++braceDepth;
-        break;
-      case '}':
-        --braceDepth;
-        break;
-      }
-      if( braceDepth == 0 ) {
-        arge.emplace_back(currentWordBegin, cur - currentWordBegin);
-        state = ParseState::BETWEEN;
-      }
-      break;
-    }
-    ++cur;
-  }
- end_of_input:
-
-  return Result::ok(std::move(arge));
-}
-
-ParseResult<TokenizedCommand> parseCommandLine(const TOGoS::StringView& line) {
+TCPR TokenizedCommand::parse(const StringView& line) {
   size_t i = 0;
 
   // TODO: Just parse the whole thing as one big list;
@@ -187,16 +49,16 @@ ParseResult<TokenizedCommand> parseCommandLine(const TOGoS::StringView& line) {
   // Skip whitespace
   while( i < line.size() && isWhitespace(line[i]) ) ++i;
   if( i == line.size() || line[i] == '#' ) {
-    return ParseResult<TokenizedCommand>::ok(std::move(TokenizedCommand::empty()));
+    return TCPR::ok(std::move(TokenizedCommand::empty()));
   }
 
   size_t pathBegin = i;
   while( i < line.size() && !isWhitespace(line[i]) ) ++i;
-  TOGoS::StringView path(&line[pathBegin], i-pathBegin);
+  StringView path(&line[pathBegin], i-pathBegin);
 
   // Skip whitespace until arguments string
   while( i < line.size() && isWhitespace(line[i]) ) ++i;
-  TOGoS::StringView argStr(&path[i], line.size()-i);
+  StringView argStr(&path[i], line.size()-i);
   
   auto listParseResult = parseList(argStr, i);
   if( listParseResult.isError() ) {
@@ -206,8 +68,8 @@ ParseResult<TokenizedCommand> parseCommandLine(const TOGoS::StringView& line) {
   }
 }
 
-void processLine(const TOGoS::StringView& line) {
-  ParseResult<TokenizedCommand> pr = parseCommandLine(line);
+void processLine(const StringView& line) {
+  TCPR pr = TokenizedCommand::parse(line);
   if( pr.isError() ) {
     Serial << "# Error parsing command: " << pr.error << "\n";
     return;
