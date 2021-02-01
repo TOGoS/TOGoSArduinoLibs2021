@@ -7,16 +7,13 @@
 #include "./ParseResult.h"
 
 namespace TOGoS { namespace Command {
-  using StringView = TOGoS::StringView;
-  using TokenList = std::vector<StringView>;
-
   class TokenizedCommand {
   public:
-    const StringView path;
-    const StringView argStr;
-    const TokenList args;
+    const TOGoS::StringView path;
+    const TOGoS::StringView argStr;
+    const std::vector<TOGoS::StringView> args;
 
-    TokenizedCommand(const StringView& path, const StringView& argStr, const std::vector<StringView> args);
+    TokenizedCommand(const TOGoS::StringView& path, const TOGoS::StringView& argStr, const std::vector<TOGoS::StringView> args);
     TokenizedCommand();
 
     bool isEmpty() const {
@@ -27,10 +24,8 @@ namespace TOGoS { namespace Command {
       return TokenizedCommand();
     }
     
-    static ParseResult<TokenizedCommand> parse(const StringView &input);
+    static ParseResult<TokenizedCommand> parse(const TOGoS::StringView &input);
   };
-  
-  ParseResult<TokenList> tokenize(const StringView& readFrom, size_t index0);
 }}
 
 #endif
