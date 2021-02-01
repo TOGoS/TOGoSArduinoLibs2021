@@ -20,10 +20,10 @@ using ParseError = TOGoS::Command::ParseError;
 using TCPR = TOGoS::Command::ParseResult<TokenizedCommand>;
 
 Print& operator<<(Print& printer, const TokenizedCommand &cmd) {
-  printer << "path:" << cmd.path;
+  printer << "path:{" << cmd.path << "}";
 
   if( cmd.argStr.size() > 0 ) {
-    printer << " cmdArgs:" << cmd.argStr;
+    printer << " argStr:{" << cmd.argStr << "}";
   }
   printer << " args:{";
   for( int i=0; i<cmd.args.size(); ++i ) {
