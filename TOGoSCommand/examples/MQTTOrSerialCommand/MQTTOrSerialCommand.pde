@@ -39,35 +39,6 @@ Print& operator<<(Print& printer, const ParseError& parseError) {
   return printer << parseError.getErrorMessage() << " at index " << parseError.errorOffset;
 }
 
-
-TCPR TokenizedCommand::parse(const StringView& line) {
-  size_t i = 0;
-
-  // TODO: Just parse the whole thing as one big list;
-  // the command path doesn't need to be treated special.
-
-  // Skip whitespace
-  while( i < line.size() && isWhitespace(line[i]) ) ++i;
-  if( i == line.size() || line[i] == '#' ) {
-    return TCPR::ok(std::move(TokenizedCommand::empty()));
-  }
-
-  size_t pathBegin = i;
-  while( i < line.size() && !isWhitespace(line[i]) ) ++i;
-  StringView path(&line[pathBegin], i-pathBegin);
-
-  // Skip whitespace until arguments string
-  while( i < line.size() && isWhitespace(line[i]) ) ++i;
-  StringView argStr(&path[i], line.size()-i);
-  
-  auto listParseResult = parseList(argStr, i);
-  if( listParseResult.isError() ) {
-    return ParseResult<TokenizedCommand>::errored(listParseResult.error);
-  } else {
-    return ParseResult<TokenizedCommand>::ok(TokenizedCommand(path, argStr, listParseResult.value));
-  }
-}
-
 void processLine(const StringView& line) {
   TCPR pr = TokenizedCommand::parse(line);
   if( pr.isError() ) {
