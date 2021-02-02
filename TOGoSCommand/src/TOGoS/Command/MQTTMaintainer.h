@@ -24,11 +24,13 @@ namespace TOGoS { namespace Command {
 class MQTTMaintainer {
   using Callback = std::function<void()>;
 
+public:
   PubSubClient *pubSubClient;
   std::string serverName;
   uint16_t serverPort;
   std::string clientId;
   std::string username;
+protected:
   std::string password;
   std::string willTopic;
   uint8_t willQos;
