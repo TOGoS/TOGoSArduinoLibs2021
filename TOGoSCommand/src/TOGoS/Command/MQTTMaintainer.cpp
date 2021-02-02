@@ -18,7 +18,7 @@ static const char *necs(const std::string& str) {
 }
 
 MQTTMaintainer MQTTMaintainer::makeStandard(
-  PubSubClient &pubSubClient,
+  PubSubClient *pubSubClient,
   const TOGoS::StringView &clientId,
   const TOGoS::StringView &topic
 ) {
@@ -32,8 +32,8 @@ MQTTMaintainer MQTTMaintainer::makeStandard(
     true, // Remember that we're gone so any garbage collectors can do their work
     "disconnected",
     true, // reconnect callback will re-subscribe, etc
-    [&pubSubClient, stateTopic]() {
-      pubSubClient.publish(stateTopic.c_str(), "online", true);
+    [pubSubClient, stateTopic]() {
+      pubSubClient->publish(stateTopic.c_str(), "online", true);
     }
   );
 }
@@ -42,13 +42,24 @@ void MQTTMaintainer::setServer(
   const TOGoS::StringView &serverName, uint16_t serverPort,
   const TOGoS::StringView &username, const TOGoS::StringView &password
 ) {
+  if( serverName == this->serverName && serverPort == this->serverPort &&
+      username == this->username && password == this->password ) {
+    return;
+  }
+
+  // Doesn't look like PubSubClient automatically reconnects
+  // when setServer changes the address, so disconnect it explicitly:
+  if( this->pubSubClient->connected() ) {
+    this->pubSubClient->disconnect();
+  }
+  
   // PubSubClient just stores the const char * without copying the contents.
   // Therefore we'd better persist the server name in here!
   this->serverName = serverName;
   this->serverPort = serverPort;
   this->username = username;
   this->password = password;
-  this->pubSubClient.setServer(this->serverName.c_str(), serverPort);
+  this->pubSubClient->setServer(this->serverName.c_str(), serverPort);
 }
 
 #ifdef _TOGOS_COMMAND_MQTTMAINTAINER_DEBUG
@@ -62,7 +73,7 @@ bool MQTTMaintainer::reconnect() {
   Serial << "# MQTTMaintainer#reconnect: Attempting to connect to " <<
     this->username << ":" << this->password << "@" <<
     this->serverName << ":" << this->serverPort << "...\n";
-  Serial << "# MQTTMaintainer#reconnect: pubSubClient.connect(" <<
+  Serial << "# MQTTMaintainer#reconnect: pubSubClient->connect(" <<
     quote(this->clientId.c_str()) << ", " <<
     quote(necs(this->username)) << ", " << necs(this->password) << ", " <<
     quote(necs(this->willTopic)) << ", " <<
@@ -72,7 +83,7 @@ bool MQTTMaintainer::reconnect() {
     this->cleanSession << ")...\n";
 #endif
   if(
-    this->pubSubClient.connect(
+    this->pubSubClient->connect(
       this->clientId.c_str(),
       necs(this->username), necs(this->password),
       necs(this->willTopic),
@@ -89,14 +100,14 @@ bool MQTTMaintainer::reconnect() {
     return true;
   } else {
 #ifdef _TOGOS_COMMAND_MQTTMAINTAINER_DEBUG
-    Serial << "# MQTTMaintainer#reconnect: connection failed; rc:" << this->pubSubClient.state() << "\n";
+    Serial << "# MQTTMaintainer#reconnect: connection failed; rc:" << this->pubSubClient->state() << "\n";
 #endif
     return false;
   }
 }
   
 bool MQTTMaintainer::update() {
-  if( !this->pubSubClient.connected() && !this->serverName.empty() ) {
+  if( !this->pubSubClient->connected() && !this->serverName.empty() ) {
     long now = millis();
     if( now - this->lastReconnectAttempt > 5000 ) {
       this->lastReconnectAttempt = now;
@@ -109,7 +120,7 @@ bool MQTTMaintainer::update() {
     return false;
   } else {
     // Client connected
-    this->pubSubClient.loop();
+    this->pubSubClient->loop();
     return true;
   }
 }

@@ -12,7 +12,7 @@ using StringView = TOGoS::StringView;
 WiFiClient wifiClient;
 PubSubClient pubSubClient(wifiClient);
 MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(
-  pubSubClient,
+  &pubSubClient,
   "mqtt-maintenance-demo", // client ID; maybe use MAC address instead?
   "mqtt-maintenance-demo"
 );

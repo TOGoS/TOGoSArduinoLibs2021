@@ -24,7 +24,7 @@ namespace TOGoS { namespace Command {
 class MQTTMaintainer {
   using Callback = std::function<void()>;
 
-  PubSubClient &pubSubClient;
+  PubSubClient *pubSubClient;
   std::string serverName;
   uint16_t serverPort;
   std::string clientId;
@@ -41,7 +41,7 @@ class MQTTMaintainer {
   
 public:
   /** Initializing server info is a /separate step/ */
-  MQTTMaintainer(PubSubClient &pubSubClient,
+  MQTTMaintainer(PubSubClient *pubSubClient,
 		 const TOGoS::StringView &clientId,
                  const TOGoS::StringView &willTopic,
                  uint8_t willQos,
@@ -67,7 +67,7 @@ protected:
 public:
 
   /** Create an MQTTMaintainer with the 'standard' settings; */
-  static MQTTMaintainer makeStandard(PubSubClient &pubSubClient,
+  static MQTTMaintainer makeStandard(PubSubClient *pubSubClient,
                                      const TOGoS::StringView &clientId,
                                      const TOGoS::StringView &topic);
 
