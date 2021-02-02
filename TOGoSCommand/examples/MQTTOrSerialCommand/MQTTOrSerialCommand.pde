@@ -74,7 +74,7 @@ Print& operator<<(Print& printer, const CommandResult& cresult) {
   return printer;
 }
 
-CommandResult processCommand(const TokenizedCommand& tcmd, CommandSource source) {
+CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource source) {
   if( tcmd.path == "echo" ) {
     for( int i=0; i<tcmd.args.size(); ++i ) {
       if( i > 0 ) Serial << " ";
@@ -98,6 +98,10 @@ CommandResult processCommand(const TokenizedCommand& tcmd, CommandSource source)
   }
 }
 
+TOGoS::Command::CommandDispatcher commandDispatcher({
+  processEchoCommand
+});
+
 void processLine(const StringView& line) {
   TCPR pr = TokenizedCommand::parse(line);
   if( pr.isError() ) {
@@ -109,7 +113,7 @@ void processLine(const StringView& line) {
 
   if( tcmd.path.size() == 0 ) return;
   
-  CommandResult cresult = processCommand(tcmd, CommandSource::CEREAL);
+  CommandResult cresult = commandDispatcher(tcmd, CommandSource::CEREAL);
   Serial << "# " << tcmd.path << ": " << cresult << "\n";
 }
 

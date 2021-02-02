@@ -27,8 +27,9 @@ namespace TOGoS { namespace Command {
   using CommandHandler = std::function<CommandResult(const TokenizedCommand &cmd, CommandSource src)>;
 
   class CommandDispatcher {
-  public:
     std::vector<CommandHandler> commandHandlers;
+  public:
+    CommandDispatcher(std::vector<CommandHandler>&& commandHandlers) : commandHandlers(commandHandlers) {}
     CommandResult operator()(const TokenizedCommand &cmd, CommandSource src);
   };
 }}
