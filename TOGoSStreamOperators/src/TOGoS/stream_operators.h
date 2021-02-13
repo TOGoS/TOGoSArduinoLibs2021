@@ -2,6 +2,7 @@
 #define _TOGOS_STREAM_OPERATORS_H
 
 #include <Print.h>
+#include <String.h>
 
 namespace TOGoS {
     class StringView;
@@ -16,5 +17,6 @@ inline Print & operator<<(Print &p, unsigned long thing) { p.print(thing); retur
 inline Print & operator<<(Print &p, double thing) { p.print(thing); return p; }
 inline Print & operator<<(Print &p, const char *thing) { p.print(thing); return p; }
 inline Print & operator<<(Print &p, const Printable &obj) { obj.printTo(p); return p; }
+inline Print & operator<<(Print &p, const String &str) { p.print(str); return p; }
 
 #endif
