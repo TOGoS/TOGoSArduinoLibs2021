@@ -1,5 +1,7 @@
 // Based on the 'Reconnecting MQTT example - non-blocking' example from the PubSub library
 
+#include "MQTTMaintainer.h"
+
 #ifdef _TOGOS_COMMAND_MQTTMAINTAINER_DEBUG
 #include <TOGoSStreamOperators.h> // For debugging
 #endif
@@ -7,8 +9,6 @@
 #include <functional>
 #include <string>
 #include <PubSubClient.h>
-
-#include "MQTTMaintainer.h"
 
 using MQTTMaintainer = TOGoS::Command::MQTTMaintainer;
 
@@ -64,7 +64,7 @@ void MQTTMaintainer::setServer(
 
 #ifdef _TOGOS_COMMAND_MQTTMAINTAINER_DEBUG
 static std::string quote(const char *s) {
-  return std::string("\"") + s + "\"";
+  return s == nullptr ? "null" : std::string("\"") + s + "\"";
 }
 #endif
 
@@ -75,7 +75,7 @@ bool MQTTMaintainer::reconnect() {
     this->serverName << ":" << this->serverPort << "...\n";
   Serial << "# MQTTMaintainer#reconnect: pubSubClient->connect(" <<
     quote(this->clientId.c_str()) << ", " <<
-    quote(necs(this->username)) << ", " << necs(this->password) << ", " <<
+    quote(necs(this->username)) << ", " << quote(necs(this->password)) << ", " <<
     quote(necs(this->willTopic)) << ", " <<
     this->willQos << ", " <<
     this->willRetain << ", " <<
@@ -108,14 +108,14 @@ bool MQTTMaintainer::reconnect() {
   
 bool MQTTMaintainer::update() {
   if( !this->pubSubClient->connected() && !this->serverName.empty() ) {
-    long now = millis();
-    if( now - this->lastReconnectAttempt > 5000 ) {
-      this->lastReconnectAttempt = now;
+    if( millis() - this->lastReconnectAttempt > 5000 ) {
       // Attempt to reconnect
       if( this->reconnect() ) {
         this->lastReconnectAttempt = 0;
         return true;
       }
+      // Reconnect actually takes a while
+      this->lastReconnectAttempt = millis();
     }
     return false;
   } else {
@@ -123,4 +123,8 @@ bool MQTTMaintainer::update() {
     this->pubSubClient->loop();
     return true;
   }
+}
+
+bool MQTTMaintainer::isConnected() {
+  return this->pubSubClient->connected();
 }

@@ -3,6 +3,9 @@
  * and also from MQTT!
  */
 
+// ESP8266 board includes 'functional' library, but unforch regular Arduino does not.
+// So until I make a replacement (a la TOGoS/StringView), you're stuck with ESP boards.
+// Which is fine for me because that's all I ever use anyway.
 #include <functional>
 #include <vector>
 
@@ -96,6 +99,18 @@ PubSubClient pubSubClient(wifiClient);
 MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(&pubSubClient, "mqtt-or-serial-demo", "mqtt-or-serial-demo"); // TODO: Let this be set later
 MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
 
+void printWifiStatus() {
+  Serial << "wifi/status-code " << WiFi.status() << "\n";
+  Serial << "wifi/ssid " << WiFi.SSID() << "\n";
+  Serial << "wifi/connected " << (WiFi.status() == WL_CONNECTED ? "true" : "false") << "\n";
+}
+
+void printMqttStatus() {
+  Serial << "mqtt/server/host " << mqttMaintainer.serverName << "\n";
+  Serial << "mqtt/server/port " << mqttMaintainer.serverPort << "\n";
+  Serial << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
+}
+
 CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource source) {
   if( tcmd.path == "echo" ) {
     for( int i=0; i<tcmd.args.size(); ++i ) {
@@ -110,11 +125,22 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     }
     return CommandResult::ok();
   } else if( tcmd.path == "status" ) {
-    Serial << "# WiFi status: " << WiFi.status() << " (" << (WiFi.status() == WL_CONNECTED ? "connected" : "not connected") << ")\n";
-    Serial << "# MQTT status: " << (pubSubClient.connected() ? "connected" : "not connected") << "\n";
-    return CommandResult::ok("existing");
+    printWifiStatus();
+    printMqttStatus();
+    return CommandResult::ok();
   } else if( tcmd.path == "hi" || tcmd.path == "hello" ) {
     Serial << "# Hi there!\n";
+    return CommandResult::ok();
+  } else if( tcmd.path == "help" ) {
+    Serial << "# Commands:\n";
+    Serial << "#   echo $arg1 .. $argN\n";
+    Serial << "#   echo/lines $arg1 .. $argN\n";
+    Serial << "#   status ; print status of WiFi, MQTT connection, etc\n";
+    Serial << "#   wifi/connect $ssid $password ; connect to a WiFi network\n";
+    Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
+    Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
+    Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
+    Serial << "# WiFi and MQTT connections will automatically reconnect\n";
     return CommandResult::ok();
   } else if( tcmd.path == "bye" ) {
     Serial << "# See ya later!\n";

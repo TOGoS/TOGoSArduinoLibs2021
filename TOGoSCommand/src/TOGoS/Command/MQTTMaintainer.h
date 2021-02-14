@@ -2,6 +2,8 @@
 #ifndef _TOGOS_COMMAND_MQTTMAINTAINER_H
 #define _TOGOS_COMMAND_MQTTMAINTAINER_H
 
+#define _TOGOS_COMMAND_MQTTMAINTAINER_DEBUG true
+
 #include <functional>
 #include <string>
 #include <PubSubClient.h>
@@ -79,6 +81,7 @@ public:
   /** If server has been set and not connected, try to connect
    * (waiting between attempts) */
   bool update();
+  bool isConnected();
 };
 
 }}

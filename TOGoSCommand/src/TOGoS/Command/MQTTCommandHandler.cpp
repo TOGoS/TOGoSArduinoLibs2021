@@ -24,7 +24,10 @@ CommandResult MQTTCommandHandler::operator()(const TokenizedCommand &cmd, Comman
     int port = atoi(std::string(cmd.args[1]).c_str());
     this->maintainer->setServer(cmd.args[0], port, username, password);
     return this->maintainer->update() ? CommandResult::ok("connected") : CommandResult::failed("unable to connect right now, but server/creds set");
-  } else if( cmd.path == "mqtt/publush" ) {
+  } else if( cmd.path == "mqtt/disconnect" ) {
+    this->maintainer->setServer("", 0, "", "");
+    return CommandResult::ok();
+  } else if( cmd.path == "mqtt/publish" ) {
     // TODO: Allow '--retain' arguments, etc.
     bool retain = false;
     if( cmd.args.size() != 2 ) {
