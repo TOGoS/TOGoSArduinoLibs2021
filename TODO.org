@@ -1,0 +1,2 @@
+** TODO TOGoSCommand/examples/MQTTOrSerialCommand : handle MQTT commands in MQTTOr
+** TODO TOGoSCommand/examples/MQTTOrSerialCommand : a way to store a 'boot' script to EEPROM
