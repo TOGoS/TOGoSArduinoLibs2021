@@ -7,8 +7,8 @@
 
 namespace TOGoS { namespace Command {
   enum class CommandSource {
-    CEREAL, // 'SERIAL' is apparently #defined as something in Arduino
-    MQTT
+    CEREAL = 0x01, // 'SERIAL' is apparently #defined as something in Arduino
+    MQTT = 0x02
   };
   enum class CommandResultCode {
     SHRUG = 0, // Returned when a handler doesn't know what a command is
