@@ -150,13 +150,13 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
   }
 }
 
-TOGoS::Command::CommandDispatcher commandDispatcher({
+TOGoS::Command::CommandDispatcher serialCommandDispatcher({
   processEchoCommand,
   wifiCommandHandler,
   mqttCommandHandler,
 });
 
-void processLine(const StringView& line) {
+void processSerialLine(const StringView& line) {
   TCPR pr = TokenizedCommand::parse(line);
   if( pr.isError() ) {
     Serial << "# Error parsing command: " << pr.error << "\n";
@@ -167,7 +167,7 @@ void processLine(const StringView& line) {
 
   if( tcmd.path.size() == 0 ) return;
   
-  CommandResult cresult = commandDispatcher(tcmd, CommandSource::CEREAL);
+  CommandResult cresult = serialCommandDispatcher(tcmd, CommandSource::CEREAL);
   Serial << "# " << tcmd.path << ": " << cresult << "\n";
 }
 
@@ -189,7 +189,7 @@ void loop() {
   while( Serial.available() > 0 ) {
     TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
     if( bufState == TLIBuffer::BufferState::READY ) {
-      processLine( commandBuffer.str() );
+      processSerialLine( commandBuffer.str() );
       commandBuffer.reset();
     }
   }
