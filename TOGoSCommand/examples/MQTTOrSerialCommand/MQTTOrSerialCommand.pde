@@ -3,6 +3,8 @@
  * and also from MQTT!
  */
 
+const char *APP_NAME = "MQTTOrSerialCommand v2021-06-18";
+
 // ESP8266 board includes 'functional' library, but unforch regular Arduino does not.
 // So until I make a replacement (a la TOGoS/StringView), you're stuck with ESP boards.
 // Which is fine for me because that's all I ever use anyway.
@@ -129,9 +131,12 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     printMqttStatus();
     return CommandResult::ok();
   } else if( tcmd.path == "hi" || tcmd.path == "hello" ) {
-    Serial << "# Hi there!\n";
+    // It is customary for 'hello' command to respond with some basic info
+    Serial << "# Hi there from " << APP_NAME << "!\n";
+    Serial << "# Type 'help' for more help.\n";
     return CommandResult::ok();
   } else if( tcmd.path == "help" ) {
+    Serial << "# Hello from " << APP_NAME << "!\n";
     Serial << "# Commands:\n";
     Serial << "#   echo $arg1 .. $argN\n";
     Serial << "#   echo/lines $arg1 .. $argN\n";
@@ -141,6 +146,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
     Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
     Serial << "# WiFi and MQTT connections will automatically reconnect\n";
+    Serial << "# unless server name is empty string (represented by '{}')\n";
     return CommandResult::ok();
   } else if( tcmd.path == "bye" ) {
     Serial << "# See ya later!\n";
