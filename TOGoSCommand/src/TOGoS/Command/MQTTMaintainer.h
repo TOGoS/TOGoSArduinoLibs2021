@@ -77,6 +77,8 @@ public:
 
   void setServer(const TOGoS::StringView &serverName, uint16_t serverPort,
                  const TOGoS::StringView &username, const TOGoS::StringView &password);
+  std::string getClientId() const { return this->clientId; }
+  void setClientId(const TOGoS::StringView &clientId);
 
   /** If server has been set and not connected, try to connect
    * (waiting between attempts) */

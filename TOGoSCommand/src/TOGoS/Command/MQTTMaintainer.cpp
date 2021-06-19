@@ -38,6 +38,16 @@ MQTTMaintainer MQTTMaintainer::makeStandard(
   );
 }
 
+void MQTTMaintainer::setClientId(
+  const TOGoS::StringView &clientId
+) {
+  if( clientId == this->clientId ) return; // Nothing to do!
+  
+  this->clientId = clientId;
+  this->pubSubClient->disconnect();
+  this->update();
+}
+
 void MQTTMaintainer::setServer(
   const TOGoS::StringView &serverName, uint16_t serverPort,
   const TOGoS::StringView &username, const TOGoS::StringView &password

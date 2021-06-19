@@ -11,6 +11,15 @@ using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 CommandResult MQTTCommandHandler::operator()(const TokenizedCommand &cmd, CommandSource src) {
   if( cmd.path == "mqtt/connected" ) {
     return CommandResult::ok(this->maintainer->pubSubClient->connected() ? "true" : "false");
+  } else if( cmd.path == "mqtt/client-id" ) {
+    if( cmd.args.size() == 0 ) {
+      return CommandResult::ok(this->maintainer->getClientId());
+    } else if( cmd.args.size() == 1 ) {
+      this->maintainer->setClientId(cmd.args[0]);
+      return CommandResult::ok(cmd.args[0]);
+    } else {
+      return CommandResult::callerError(std::string(cmd.path) + " takes 0 or 1 argument: [new client ID]");
+    }
   } else if( cmd.path == "mqtt/connect" ) {
     StringView username;
     StringView password;
