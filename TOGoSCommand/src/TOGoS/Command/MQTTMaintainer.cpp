@@ -22,7 +22,7 @@ MQTTMaintainer MQTTMaintainer::makeStandard(
   const TOGoS::StringView &clientId,
   const TOGoS::StringView &topic
 ) {
-  std::string stateTopic = (std::string)topic + "/state";
+  std::string stateTopic = (std::string)topic + "/status";
   
   return MQTTMaintainer(
     pubSubClient,
