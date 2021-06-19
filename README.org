@@ -1,0 +1,25 @@
+#+TITLE: TOGoS's Arduino Apps
+
+Actually ESP8266 apps, mostly for WeMos D1 mini,
+but I use the Arduino framework and IDE.
+
+These rely on TOGoSArduinoLibs2021, which will hopefully
+help me share code better than the other scattered Arduino projects.
+I thought of making this just an 'apps' branch in that
+same repo (which would also include the libs),
+but I can always merge them later.
+
+*** "Old" arduino projects
+
+For reference.
+Or maybe to update them to the new conventions and import them.
+
+"Old" meaning "before TOGoSArduinoLibs20201"
+
+- ArduinoPowerSwitch
+- ESP8266-MQTT-Sensor
+- Thermostat2019
+- PowerCube
+- ArduinoLightController
+- ArduinoLEDAnimator2021
+- ArduinoChargeController
