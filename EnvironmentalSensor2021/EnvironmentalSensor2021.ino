@@ -1,4 +1,6 @@
-const char * APP_NAME = "EnvironmentalSensor2021 v0.0.2";
+const char *APP_NAME = "EnvironmentalSensor2021";
+const char *APP_SHORT_NAME = "ES2021";
+const char *APP_VERSION = "0.0.3";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
@@ -40,6 +42,8 @@ extern "C" {
 #include <TOGoS/Command/MQTTCommandHandler.h>
 #include <TOGoSSHT20.h>
 #include <TOGoSSSD1306.h>
+#include <TOGoS/SSD1306/Printer.h>
+#include <TOGoS/SSD1306/font8x8.h>
 #include <TOGoSStreamOperators.h>
 #include <TOGoSStringView.h>
 
@@ -148,7 +152,16 @@ MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
 // This is what happens when you break naming conventions!
 // People get confused!
 TwoWire i2c;
-TOGoS::SHT20 sht20(i2c);
+TOGoS::SHT20::Driver sht20(i2c);
+TOGoS::SSD1306::Driver ssd1306(i2c);
+
+struct ES2021Reading {
+  unsigned long time;
+  // This isn't great;
+  // I just don't want to bother representing 'no data' for now.
+  TOGoS::SHT20::EverythingReading data =
+    TOGoS::SHT20::EverythingReading(TOGoS::SHT20::TemperatureReading(0), TOGoS::SHT20::HumidityReading(0));
+} latestReading;
 
 //// Stateful functions
 
@@ -230,7 +243,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     printPins();
     return CommandResult::ok();
   } else if( tcmd.path == "hi" || tcmd.path == "hello" ) {
-    Serial << "# Hello from " << APP_NAME << "!\n";
+    Serial << "# Hello from " << APP_NAME << " v" << APP_VERSION << "!\n";
     return CommandResult::ok();
   } else if( tcmd.path == "digital-write" ) {
     if( tcmd.args.size() != 2 ) {
@@ -238,11 +251,12 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     }
     digitalWrite(atoi(std::string(tcmd.args[0]).c_str()), atoi(std::string(tcmd.args[1]).c_str()));
     return CommandResult::ok();
-  } else if( tcmd.path == "sht20/read" ) {
+  } else if( tcmd.path == "sht20/retermad" ) {
     char buf[64];
     TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
-    bufPrn << "temp:" << sht20.temperature() << "C" << " "
-           << "humid:" << sht20.humidity() << "%";
+    TOGoS::SHT20::EverythingReading reading = sht20.readEverything();
+    bufPrn << "temp:" << reading.getTempC() << "C" << " "
+           << "humid:" << reading.getRhPercent() << "%";
     return CommandResult::ok(std::string(bufPrn.str()));
   } else if( tcmd.path == "help" ) {
     Serial << "# Hello from " << APP_NAME << "!\n";
@@ -307,6 +321,63 @@ using TLIBuffer = TOGoS::Command::TLIBuffer;
 
 TLIBuffer commandBuffer;
 
+void drawBackground() {
+  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+  
+  ssd1306.clear();
+  ssd1306.gotoRowCol(0,0);
+  printer << APP_SHORT_NAME << " " << APP_VERSION;
+}
+
+void redrawStalenessBar() {
+  int screenWidth = ssd1306.getColumnCount();
+  ssd1306.gotoRowCol(1,0);
+  long timeSincePreviousReading = millis() - latestReading.time;
+  int stalenessBarWidth = screenWidth * std::min((unsigned int)4000,(unsigned int)timeSincePreviousReading) / 4000;
+  for( int i=0; i<stalenessBarWidth; ++i ) {
+    ssd1306.sendData(0x42);
+  }
+  for( int i=stalenessBarWidth; i<screenWidth; ++i ) {
+    ssd1306.sendData(0x7E);
+  }
+}
+
+void redrawReading() {
+  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+
+  ssd1306.gotoRowCol(2,0);
+  printer << "Temperature:";
+  printer.clearToEndOfRow();
+  
+  ssd1306.gotoRowCol(3,12);
+  printer.print(latestReading.data.getTempF(),1);
+  printer << "F / ";
+  printer.print(latestReading.data.getTempC(),1);
+  printer << "C";
+  printer.clearToEndOfRow();
+  
+  ssd1306.gotoRowCol(4,0);
+  printer << "Humidity:";
+  printer.clearToEndOfRow();
+
+  ssd1306.gotoRowCol(5,12);
+  printer.print(latestReading.data.getRhPercent(),1);
+  printer << "%";
+  printer.clearToEndOfRow();
+
+  ssd1306.gotoRowCol(6,0);
+  printer << "VPD: ";
+  printer.print(latestReading.data.getVpdKpa(),1);
+  printer << " kPa";
+  printer.clearToEndOfRow();
+
+  ssd1306.gotoRowCol(7,0);
+  printer << "DP : ";
+  printer.print(latestReading.data.getDewPoint().getF(),0);
+  printer << " F";
+  printer.clearToEndOfRow();
+}
+
 void setup() {
   delay(500); // Standard 'give me time to reprogram it' delay in case the program messes up some I/O pins
   Serial.begin(115200);
@@ -319,14 +390,27 @@ void setup() {
   blinkBuiltin(BOOTING_BLINKS); // 5 blinks = booting, same as ArduinoPowerSwitch
   Serial << "# Initializing I2C...\n";
   i2c.begin();
+  
   Serial << "# Initializing SHT20...\n";
-  sht20.begin(TOGoS::SHT20::DEFAULT_ADDRESS);
+  sht20.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
+
+  Serial << "# Initializing SSD1306...\n";
+  ssd1306.begin(0x3C);
+  Serial << "# And writing to it...\n";
+  ssd1306.displayOn();
+  ssd1306.setBrightness(255);
+  drawBackground();
+  
   Serial << "# We managed to not crash during boot!\n";
   Serial << "# Type 'help' for help.\n";
+
+  latestReading.time = millis() - 100000;
 }
 
 void loop() {
+  unsigned long currentTime = millis();
+  
   while( Serial.available() > 0 ) {
     TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
     if( bufState == TLIBuffer::BufferState::READY ) {
@@ -336,4 +420,13 @@ void loop() {
   }
   delay(10);
   mqttMaintainer.update();
+
+  if( currentTime - latestReading.time > 2000 ) {
+    latestReading.data = sht20.readEverything();
+    latestReading.time = currentTime;
+    redrawStalenessBar();
+    redrawReading();
+  } else {
+    redrawStalenessBar();
+  }
 }
