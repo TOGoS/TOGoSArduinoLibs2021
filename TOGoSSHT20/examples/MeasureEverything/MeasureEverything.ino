@@ -1,6 +1,7 @@
-#include "TOGoSSHT20.h"
+#include <TOGoSSHT20.h>
 #include <TOGoSStreamOperators.h>
-TOGoS::SHT20 sht20;
+
+TOGoS::SHT20::Driver sht20(Wire);
 
 void setup()
 {
@@ -11,15 +12,28 @@ void setup()
 
 void loop()
 {
-  sht20.measure_all();
+  TOGoS::SHT20::EverythingReading reading = sht20.readEverything();
   Serial << "# Hello from TOGoSSHT20/examples/MeasureEverything\n";
+  Serial << "# " << reading.getTemperature().getC() << "°C\n";
+  Serial << "# " << reading.getTemperature().getF() << "°F\n";
+  Serial << "# " << reading.getDewPoint().getC() << "°C dew point\n";
+  Serial << "# " << reading.getDewPoint().getF() << "°F dew point\n";
+  Serial << "# " << reading.getRhPercent() << " %RH\n";
+  Serial << "# " << reading.getVpdKpa() << " kPa VPD\n";
+  Serial << "\n";
+
+  sht20.measure_all();
+
+  Serial << "# Readings from original code:\n";
   Serial << "# " << sht20.tempC << "°C\n";
   Serial << "# " << sht20.tempF << "°F\n";
   Serial << "# " << sht20.dew_pointC << "°C dew point\n";
   Serial << "# " << sht20.dew_pointF << "°F dew point\n";
   Serial << "# " << sht20.RH << " %RH\n";
-  Serial << "# " << sht20.vpd() << " kPa VPD\n";
+  Serial << "# " << sht20.vpd_kPa << " kPa VPD\n";
   Serial << "\n";
+  Serial << "\n";
+  
   delay(5000);
 }
 

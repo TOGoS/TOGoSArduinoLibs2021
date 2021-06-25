@@ -13,14 +13,33 @@
 #define TEMPERATURE_DELAY      100
 #define HUMIDITY_DELAY         40
 
-bool TOGoS::SHT20::begin(uint8_t address)
+/** Vapor deficit, in kPa */
+float TOGoS::SHT20::EverythingReading::getVpdKpa() const {
+  float tempC = this->getTempC();
+  float es = 0.6108 * exp(17.27 * tempC / (tempC + 237.3));
+  float ae = this->getRh() * es;
+  return es - ae;
+}
+TOGoS::SHT20::Temperature TOGoS::SHT20::EverythingReading::getDewPoint() const {
+  float tem = -1.0 * this->getTempC();
+  float esdp = 6.112 * exp(-1.0 * 17.67 * tem / (243.5 - tem));
+  float ed = this->getRh() * esdp;
+  float eln = log(ed / 6.112);
+  return TOGoS::SHT20::Temperature(-243.5 * eln / (eln - 17.67 ));
+}
+
+
+
+
+
+bool TOGoS::SHT20::Driver::begin(uint8_t address)
 {
   this->address = address;
 
   return connected();
 }
 
-void TOGoS::SHT20::reset()
+void TOGoS::SHT20::Driver::reset()
 {
   Wire.beginTransmission(this->address);
   Wire.write(SHT20_RESET);
@@ -41,14 +60,44 @@ void TOGoS::SHT20::reset()
   Wire.endTransmission();
 }
 
-void TOGoS::SHT20::measure_all()
+void TOGoS::SHT20::Driver::measure_all()
 {
   // also measures temp/humidity
   vpd();
   dew_point();
 }
 
-float TOGoS::SHT20::temperature()
+TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
+  // TODO: There may be some redundancy, here.
+  // Like maybe we don't need to call reset twice?
+  // Or at all?  I don't actually know what reset()s purpose is.
+
+  uint8_t lsb, msb;
+  
+  this->reset();
+  Wire.beginTransmission(this->address);
+  Wire.write(SHT20_TEMP);
+  Wire.endTransmission();
+  delay(TEMPERATURE_DELAY);
+  Wire.requestFrom(this->address, 2);
+  msb = Wire.read();
+  lsb = Wire.read();
+  TOGoS::SHT20::TemperatureReading temp(msb << 8 | lsb);
+
+  this->reset();
+  Wire.beginTransmission(this->address);
+  Wire.write(SHT20_HUMID);
+  Wire.endTransmission();
+  delay(HUMIDITY_DELAY);
+  Wire.requestFrom(this->address, 2);
+  msb = Wire.read();
+  lsb = Wire.read();
+  TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
+
+  return TOGoS::SHT20::EverythingReading(temp, humid);
+}
+
+float TOGoS::SHT20::Driver::temperature()
 {
   this->reset();
   Wire.beginTransmission(this->address);
@@ -64,7 +113,7 @@ float TOGoS::SHT20::temperature()
   return tempC;
 }
 
-float TOGoS::SHT20::temperature_f()
+float TOGoS::SHT20::Driver::temperature_f()
 {
   this->reset();
   Wire.beginTransmission(this->address);
@@ -80,7 +129,7 @@ float TOGoS::SHT20::temperature_f()
   return tempF;
 }
 
-float TOGoS::SHT20::humidity()
+float TOGoS::SHT20::Driver::humidity()
 {
   this->reset();
   Wire.beginTransmission(this->address);
@@ -95,7 +144,7 @@ float TOGoS::SHT20::humidity()
   return RH;
 }
 
-float TOGoS::SHT20::vpd()
+float TOGoS::SHT20::Driver::vpd()
 {
   temperature();
   humidity();
@@ -107,7 +156,7 @@ float TOGoS::SHT20::vpd()
   return vpd_kPa;
 }
 
-float TOGoS::SHT20::dew_point()
+float TOGoS::SHT20::Driver::dew_point()
 {
   temperature();
   humidity();
@@ -122,7 +171,7 @@ float TOGoS::SHT20::dew_point()
   return dew_pointC;
 }
 
-bool TOGoS::SHT20::connected()
+bool TOGoS::SHT20::Driver::connected()
 {
   Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
