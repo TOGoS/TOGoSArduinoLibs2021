@@ -22,18 +22,6 @@ void loop()
   Serial << "# " << reading.getVpdKpa() << " kPa VPD\n";
   Serial << "\n";
 
-  sht20.measure_all();
-
-  Serial << "# Readings from original code:\n";
-  Serial << "# " << sht20.tempC << "°C\n";
-  Serial << "# " << sht20.tempF << "°F\n";
-  Serial << "# " << sht20.dew_pointC << "°C dew point\n";
-  Serial << "# " << sht20.dew_pointF << "°F dew point\n";
-  Serial << "# " << sht20.RH << " %RH\n";
-  Serial << "# " << sht20.vpd_kPa << " kPa VPD\n";
-  Serial << "\n";
-  Serial << "\n";
-  
   delay(5000);
 }
 

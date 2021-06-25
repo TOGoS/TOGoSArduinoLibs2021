@@ -60,18 +60,10 @@ void TOGoS::SHT20::Driver::reset()
   Wire.endTransmission();
 }
 
-void TOGoS::SHT20::Driver::measure_all()
-{
-  // also measures temp/humidity
-  vpd();
-  dew_point();
-}
-
 TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   // TODO: There may be some redundancy, here.
-  // Like maybe we don't need to call reset twice?
-  // Or at all?  I don't actually know what reset()s purpose is.
-
+  // Like maybe we don't need to call reset every time?
+  
   uint8_t lsb, msb;
   
   this->reset();
@@ -95,80 +87,6 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
 
   return TOGoS::SHT20::EverythingReading(temp, humid);
-}
-
-float TOGoS::SHT20::Driver::temperature()
-{
-  this->reset();
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_TEMP);
-  Wire.endTransmission();
-  delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(this->address, 2);
-  uint8_t msb = Wire.read();
-  uint8_t lsb = Wire.read();
-  uint16_t value = msb << 8 | lsb;
-  tempC = value * (175.72 / 65536.0)- 46.85;
-  tempF = ((value * (175.72 / 65536.0)- 46.85)  * 1.8) + 32;
-  return tempC;
-}
-
-float TOGoS::SHT20::Driver::temperature_f()
-{
-  this->reset();
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_TEMP);
-  Wire.endTransmission();
-  delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(this->address, 2);
-  uint8_t msb = Wire.read();
-  uint8_t lsb = Wire.read();
-  uint16_t value = msb << 8 | lsb;
-  tempC = value * (175.72 / 65536.0)- 46.85;
-  tempF = ((value * (175.72 / 65536.0)- 46.85)  * 1.8) + 32;
-  return tempF;
-}
-
-float TOGoS::SHT20::Driver::humidity()
-{
-  this->reset();
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_HUMID);
-  Wire.endTransmission();
-  delay(HUMIDITY_DELAY);
-  Wire.requestFrom(this->address, 2);
-  uint8_t msb = Wire.read();
-  uint8_t lsb = Wire.read();
-  uint16_t value = msb << 8 | lsb;
-  RH = value * (125.0 / 65536.0) - 6.0;
-  return RH;
-}
-
-float TOGoS::SHT20::Driver::vpd()
-{
-  temperature();
-  humidity();
-
-  float es = 0.6108 * exp(17.27 * tempC / (tempC + 237.3));
-  float ae = RH / 100 * es;
-  vpd_kPa = es - ae;
-
-  return vpd_kPa;
-}
-
-float TOGoS::SHT20::Driver::dew_point()
-{
-  temperature();
-  humidity();
-
-  float tem = -1.0 * tempC;
-  float esdp = 6.112 * exp(-1.0 * 17.67 * tem / (243.5 - tem));
-  float ed = RH / 100.0 * esdp;
-  float eln = log(ed / 6.112);
-  dew_pointC = -243.5 * eln / (eln - 17.67 );
-
-  dew_pointF = (dew_pointC * 1.8) + 32;
-  return dew_pointC;
 }
 
 bool TOGoS::SHT20::Driver::connected()

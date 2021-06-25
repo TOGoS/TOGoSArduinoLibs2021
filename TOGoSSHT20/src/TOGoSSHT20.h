@@ -90,14 +90,6 @@ public:
   
   bool begin(uint8_t address=DEFAULT_ADDRESS);
   EverythingReading readEverything();
-  
-  // TODO: Remove
-  float temperature();
-  float temperature_f();
-  float humidity();
-  float vpd();
-  float dew_point();
-  void measure_all();
   bool connected();
 };
 
