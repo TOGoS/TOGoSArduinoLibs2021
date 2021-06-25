@@ -1,5 +1,9 @@
 ** [2021-06-25] Frustration
 
+Trying to get an SSD1306 display to work
+with my WeMos D1 Mini.
+Also there is sometimes an SHT20 connected to the same I2C bus.
+
 Maybe this OLED display doesn't have a built-in pull-up resistor?
 Because it seems to work only when I also have the SHT20 plugged into the I2C bus.
 Otherwise no examples were working.
@@ -30,3 +34,9 @@ Remember!
   between the declaration and access; look into it later.
 - This particular SSD1306 (all B&W - this one doesn't have that nice yellow strip)
   seems to work only when the SHT20 is also plugged in.
+
+[2021-06-25T02:20] I unplugged the SHT20 and rebooted the thing and it seems still working.
+Maybe it's just the SHT20 has to be plugged in when you first program it, idfk.
+
+[2021-06-25T02:24] Hmm; that doesn't seem to be the case, either.
+Maybe the SHT20 needing to be plugged in was a red herring.
