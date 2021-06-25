@@ -3,7 +3,8 @@
 
 // Data sheet for the SSD1306: https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf
 
-void TOGoS::SSD1306::Driver::begin() {
+void TOGoS::SSD1306::Driver::begin(uint8_t address) {
+  this->address = address;
   sendCommand(0xAE);            //display off
   sendCommand(0xA6);            //Set Normal Display (default)
   sendCommand(0xAE);            //DISPLAYOFF
@@ -36,17 +37,17 @@ void TOGoS::SSD1306::Driver::begin() {
 }
 
 void TOGoS::SSD1306::Driver::sendCommand(uint8_t command) {
-  this->twi.beginTransmission(this->address);    // begin I2C communication
-  this->twi.write(SSD1306_Command_Mode);   // Set OLED Command mode
-  this->twi.write(command);
-  this->twi.endTransmission();             // End I2C communication
+  this->i2c->beginTransmission(this->address);    // begin I2C communication
+  this->i2c->write(SSD1306_Command_Mode);   // Set OLED Command mode
+  this->i2c->write(command);
+  this->i2c->endTransmission();             // End I2C communication
 }
 
 void TOGoS::SSD1306::Driver::sendData(uint8_t data) {
-  this->twi.beginTransmission(this->address); // begin I2C transmission
-  this->twi.write(SSD1306_Data_Mode);            // data mode
-  this->twi.write(data);
-  this->twi.endTransmission();                    // stop I2C transmission
+  this->i2c->beginTransmission(this->address); // begin I2C transmission
+  this->i2c->write(SSD1306_Data_Mode);            // data mode
+  this->i2c->write(data);
+  this->i2c->endTransmission();                    // stop I2C transmission
 
   // Increment where we think we are, assuming the usual addressing mode:
   ++this->atColumn;

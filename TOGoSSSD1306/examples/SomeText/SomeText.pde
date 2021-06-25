@@ -3,7 +3,7 @@
 #include <TOGoS/SSD1306/font8x8.h>
 #include <TOGoS/SSD1306/Printer.h>
 
-TOGoS::SSD1306::Driver oled(Wire, 0x3C);
+TOGoS::SSD1306::Driver oled(Wire);
 TOGoS::SSD1306::Printer oledPrinter(oled, TOGoS::SSD1306::font8x8);
 
 void setup() {
@@ -15,7 +15,7 @@ void setup() {
   Serial.println("Wire.begin()...");
   Wire.begin();
   Serial.println("oled.begin()...");
-  oled.begin();
+  oled.begin(0x3C);
   oled.displayOn();
   oled.setBrightness(255);
   Serial.println("oled.clear()...");
