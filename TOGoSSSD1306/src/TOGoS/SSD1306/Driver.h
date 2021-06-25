@@ -36,6 +36,9 @@ namespace TOGoS { namespace SSD1306 {
     void gotoRowCol(uint8_t row, uint8_t col);
     
     uint8_t atRow = 0, atColumn = 0;
+
+    int getRowCount() { return rowCount; }
+    int getColumnCount() { return columnCount; }
   };
 }}
 
