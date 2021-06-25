@@ -11,6 +11,7 @@ namespace TOGoS { namespace SSD1306 {
   public:
     Printer(TOGoS::SSD1306::Driver &driver, const uint8_t *font) : driver(driver), font(font) {}
     void setXor(uint8_t pattern) { this->xorPattern = pattern; }
+    void clearToEndOfRow() { this->driver.clearToEndOfRow(this->xorPattern); }
     virtual size_t write(uint8_t ch) override;
     virtual int availableForWrite() const {
       return true;

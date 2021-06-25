@@ -25,17 +25,18 @@ void setup() {
   oled.sendData(0xA5);
   oled.sendData(0x5A);
   oled.sendData(0x00);
-  oledPrinter.setXor(0xFF);
   oledPrinter.print("Initializing!");
   oled.clearToEndOfRow(0xFF);
   oled.clearToEndOfRow(0x3F);
-  oledPrinter.setXor(0x00);
   delay(5000);
   oled.clear();
   oled.gotoRowCol(0,0);
   oledPrinter.print("Header 1!");
   oled.gotoRowCol(1,0);
-  oledPrinter.print("Header 2!");
+  oledPrinter.setXor(0xFF);
+  oledPrinter.print("Inverted header!");
+  oledPrinter.clearToEndOfRow();
+  oledPrinter.setXor(0x00);
   oled.gotoRowCol(2,0);
   oledPrinter.print("Body 1!");
 
