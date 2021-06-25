@@ -7,7 +7,7 @@ namespace TOGoS { namespace SSD1306 {
   class Printer : public Print {
     TOGoS::SSD1306::Driver &driver;
     const uint8_t *font;
-    uint8_t xorPattern;
+    uint8_t xorPattern = 0;
   public:
     Printer(TOGoS::SSD1306::Driver &driver, const uint8_t *font) : driver(driver), font(font) {}
     void setXor(uint8_t pattern) { this->xorPattern = pattern; }
