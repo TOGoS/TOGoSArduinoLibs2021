@@ -1,4 +1,4 @@
-const char * APP_NAME = "EnvironmentalSensor2021 v0.0.1";
+const char * APP_NAME = "EnvironmentalSensor2021 v0.0.2";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
@@ -22,11 +22,14 @@ extern "C" {
 #include <functional>
 #include <vector>
 
+// Arduino libraries
 #include <ESP8266WiFi.h>
 #include <Print.h>
 #include <PubSubClient.h>
+#include <Wire.h>
 
-#include <TOGoSStringView.h>
+// TOGoS libraries
+#include <TOGoSBufferPrint.h>
 #include <TOGoSCommand.h>
 #include <TOGoS/Command/TLIBuffer.h>
 #include <TOGoS/Command/ParseError.h>
@@ -35,7 +38,10 @@ extern "C" {
 #include <TOGoS/Command/CommandDispatcher.h>
 #include <TOGoS/Command/MQTTMaintainer.h>
 #include <TOGoS/Command/MQTTCommandHandler.h>
+#include <TOGoSSHT20.h>
+#include <TOGoSSSD1306.h>
 #include <TOGoSStreamOperators.h>
+#include <TOGoSStringView.h>
 
 using CommandHandler = TOGoS::Command::CommandHandler;
 using CommandSource = TOGoS::Command::CommandSource;
@@ -46,16 +52,7 @@ using StringView = TOGoS::StringView;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 using TCPR = TOGoS::Command::ParseResult<TokenizedCommand>;
 
-void blinkBuiltin(int count) {
-  for( ; count > 0 ; --count ) {
-    delay(74);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(150);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(75);
-  }
-}
-
+//// Pure-ish functions
 
 char hexDigit(int num) {
   num = num & 0xF;
@@ -82,7 +79,7 @@ void printMacAddressHex(uint8_t *macAddress, const char *octetSeparator, class P
   }
 }
 
-
+//// Print overloads
 
 Print& operator<<(Print &printer, const TokenizedCommand &cmd) {
   printer << "path:{" << cmd.path << "}";
@@ -120,12 +117,50 @@ Print& operator<<(Print& printer, const CommandResult& cresult) {
   return printer;
 }
 
+//// Additional types
+
 namespace TOGoS { namespace Command {
   class WiFiCommandHandler {
   public:
     CommandResult operator()(const TokenizedCommand &cmd, CommandSource src);
   };
 }}
+
+//// Global variables
+
+using MQTTMaintainer = TOGoS::Command::MQTTMaintainer;
+using MQTTCommandHandler = TOGoS::Command::MQTTCommandHandler;
+using WiFiCommandHandler = TOGoS::Command::WiFiCommandHandler;
+
+// WiFiCommandHandler wifiCommandHandler(); // This confuses the compiler lol.
+WiFiCommandHandler wifiCommandHandler;
+WiFiClient wifiClient;
+PubSubClient pubSubClient(wifiClient);
+MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(
+  &pubSubClient, getDefaultClientId(), getDefaultClientId());
+MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
+
+// Compiler: "'Wire' does not name a type"
+// 
+// Me: WTF, this is horsecrap
+// 
+// Me later: Oh.  TwoWire is the class.  Wire is the instance.
+// This is what happens when you break naming conventions!
+// People get confused!
+TwoWire i2c;
+TOGoS::SHT20 sht20(i2c);
+
+//// Stateful functions
+
+void blinkBuiltin(int count) {
+  for( ; count > 0 ; --count ) {
+    delay(74);
+    digitalWrite(LED_BUILTIN, LOW);
+    delay(150);
+    digitalWrite(LED_BUILTIN, HIGH);
+    delay(75);
+  }
+}
 
 CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedCommand &cmd, CommandSource src) {
   if( cmd.path == "wifi/connect" ) {
@@ -139,23 +174,10 @@ CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedComm
   }
 }
 
-using MQTTMaintainer = TOGoS::Command::MQTTMaintainer;
-using MQTTCommandHandler = TOGoS::Command::MQTTCommandHandler;
-using WiFiCommandHandler = TOGoS::Command::WiFiCommandHandler;
-
 std::string getDefaultClientId() {
   byte macAddressBuffer[6];
   return macAddressToHex(macAddressBuffer, ":");
 }
-
-// WiFiCommandHandler wifiCommandHandler(); // This confuses the compiler lol.
-WiFiCommandHandler wifiCommandHandler;
-WiFiClient wifiClient;
-PubSubClient pubSubClient(wifiClient);
-MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(
-  &pubSubClient, getDefaultClientId(), getDefaultClientId());
-MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
-
 
 void printWifiStatus() {
   byte macAddressBuffer[6];
@@ -215,7 +237,13 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
       return CommandResult::callerError("Usage: digitalwrite <pin : uint> <value : 0|1>");
     }
     digitalWrite(atoi(std::string(tcmd.args[0]).c_str()), atoi(std::string(tcmd.args[1]).c_str()));
-    return Commandresult::ok();
+    return CommandResult::ok();
+  } else if( tcmd.path == "sht20/read" ) {
+    char buf[64];
+    TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
+    bufPrn << "temp:" << sht20.temperature() << "C" << " "
+           << "humid:" << sht20.humidity() << "%";
+    return CommandResult::ok(std::string(bufPrn.str()));
   } else if( tcmd.path == "help" ) {
     Serial << "# Hello from " << APP_NAME << "!\n";
     Serial << "# \n";
@@ -225,6 +253,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     Serial << "#   status ; print status of WiFi, MQTT connection, etc\n";
     Serial << "#   pins ; print pin information\n";
     Serial << "#   wifi/connect $ssid $password ; connect to a WiFi network\n";
+    Serial << "#   sht20/read ; Read values from SHT20\n";
     Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
     Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
@@ -288,6 +317,12 @@ void setup() {
   Serial << "\n\n"; // Get past any junk in the terminal
   Serial << "# " << APP_NAME << " setup()...\n";
   blinkBuiltin(BOOTING_BLINKS); // 5 blinks = booting, same as ArduinoPowerSwitch
+  Serial << "# Initializing I2C...\n";
+  i2c.begin();
+  Serial << "# Initializing SHT20...\n";
+  sht20.begin(TOGoS::SHT20::DEFAULT_ADDRESS);
+  delay(100);
+  Serial << "# We managed to not crash during boot!\n";
   Serial << "# Type 'help' for help.\n";
 }
 
