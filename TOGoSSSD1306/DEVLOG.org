@@ -40,3 +40,12 @@ Maybe it's just the SHT20 has to be plugged in when you first program it, idfk.
 
 [2021-06-25T02:24] Hmm; that doesn't seem to be the case, either.
 Maybe the SHT20 needing to be plugged in was a red herring.
+
+
+** [2021-06-25]
+
+Somewhat mystified about why, after I've written a new program to my WeMos board
+that doesn't do anything with the SSD1306, body text is still scrolling.
+Did I tell it to automatically scroll?  Must have.  Humph.
+
+I suppose I should document those commands in SomeText.ino's ~loop~.
