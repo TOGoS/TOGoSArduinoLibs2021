@@ -39,6 +39,7 @@ void setup() {
   oledPrinter.setXor(0x00);
   oled.gotoRowCol(2,0);
   oledPrinter.print("Body 1!");
+  oledPrinter.clearToEndOfRow();
 
   //oled.activateScroll();
 
