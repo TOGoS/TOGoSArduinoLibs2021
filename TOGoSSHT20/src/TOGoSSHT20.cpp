@@ -1,30 +1,41 @@
 #include "TOGoSSHT20.h"
 
-bool TOGoS::SHT20::begin(uint8_t resolution, uint8_t address, TwoWire &wirePort)
-{
-   _address = address;
-   _resolution = resolution;
-  _i2cPort = &wirePort;
+#define SHT20_TEMP             0xF3
+#define SHT20_HUMID            0xF5
+#define SHT20_WRITE_USER_REG   0xE6
+#define SHT20_READ_USER_REG    0xE7
+#define SHT20_RESET            0xFE
+#define _DISABLE_ONCHIP_HEATER 0b00000000
+#define _ENABLE_OTP_RELOAD     0b00000000
+#define _DISABLE_OTP_RELOAD    0b00000010
+#define _RESERVED_BITMASK      0b00111000
+#define SOFT_RESET_DELAY       20
+#define TEMPERATURE_DELAY      100
+#define HUMIDITY_DELAY         40
 
+bool TOGoS::SHT20::begin(uint8_t address)
+{
+  this->address = address;
 
   return connected();
 }
-void TOGoS::SHT20::_reset()
+
+void TOGoS::SHT20::reset()
 {
-  Wire.beginTransmission(SHT20_I2C);
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_RESET);
   Wire.endTransmission();
   delay(SOFT_RESET_DELAY);
-  _onchip_heater = _DISABLE_ONCHIP_HEATER;
-  _otp_reload = _DISABLE_OTP_RELOAD;
+  this->onchip_heater = _DISABLE_ONCHIP_HEATER;
+  this->otp_reload = _DISABLE_OTP_RELOAD;
 
-  Wire.beginTransmission(SHT20_I2C);
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
   Wire.endTransmission();
-  Wire.requestFrom(SHT20_I2C, 1);
+  Wire.requestFrom(this->address, 1);
   uint8_t config = Wire.read();
-  config = ((config & _RESERVED_BITMASK) | _resolution | _onchip_heater | _otp_reload);
-  Wire.beginTransmission(SHT20_I2C);
+  config = ((config & _RESERVED_BITMASK) | this->resolution | this->onchip_heater | this->otp_reload);
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_WRITE_USER_REG);
   Wire.write(config);
   Wire.endTransmission();
@@ -39,12 +50,12 @@ void TOGoS::SHT20::measure_all()
 
 float TOGoS::SHT20::temperature()
 {
-  _reset();
-  Wire.beginTransmission(SHT20_I2C);
+  this->reset();
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_TEMP);
   Wire.endTransmission();
   delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(SHT20_I2C, 2);
+  Wire.requestFrom(this->address, 2);
   uint8_t msb = Wire.read();
   uint8_t lsb = Wire.read();
   uint16_t value = msb << 8 | lsb;
@@ -55,12 +66,12 @@ float TOGoS::SHT20::temperature()
 
 float TOGoS::SHT20::temperature_f()
 {
-  _reset();
-  Wire.beginTransmission(SHT20_I2C);
+  this->reset();
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_TEMP);
   Wire.endTransmission();
   delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(SHT20_I2C, 2);
+  Wire.requestFrom(this->address, 2);
   uint8_t msb = Wire.read();
   uint8_t lsb = Wire.read();
   uint16_t value = msb << 8 | lsb;
@@ -71,12 +82,12 @@ float TOGoS::SHT20::temperature_f()
 
 float TOGoS::SHT20::humidity()
 {
-  _reset();
-  Wire.beginTransmission(SHT20_I2C);
+  this->reset();
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_HUMID);
   Wire.endTransmission();
   delay(HUMIDITY_DELAY);
-  Wire.requestFrom(SHT20_I2C, 2);
+  Wire.requestFrom(this->address, 2);
   uint8_t msb = Wire.read();
   uint8_t lsb = Wire.read();
   uint16_t value = msb << 8 | lsb;
@@ -113,10 +124,10 @@ float TOGoS::SHT20::dew_point()
 
 bool TOGoS::SHT20::connected()
 {
-  Wire.beginTransmission(SHT20_I2C);
+  Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
   Wire.endTransmission();
-  Wire.requestFrom(SHT20_I2C, 1);
+  Wire.requestFrom(this->address, 1);
   uint8_t config = Wire.read();
   
   if (config != 0xFF) {
