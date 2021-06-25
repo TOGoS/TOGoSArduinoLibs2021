@@ -1,0 +1,32 @@
+** [2021-06-25] Frustration
+
+Maybe this OLED display doesn't have a built-in pull-up resistor?
+Because it seems to work only when I also have the SHT20 plugged into the I2C bus.
+Otherwise no examples were working.
+
+Address = 0x3C seems to be right, though it is a 128x64, not a 128x32.
+Before I left Madison it seemed I got PowerCube 1ce50d00 working, but *not* the Adafruit library.
+
+But as of [2021-06-25T01:09:40-05:00] it's the other way around.
+
+Not only does PowerCube (and also the ACROBOTIC_SSD1306 example) not display anything; it crashes!
+I think this is actually due to the font memory not being handled correctly.
+Maybe if I change it to just be a regular uint8_t[]...
+
+[2021-06-25T01:24:23-05:00] Yep.  Commenting out this stuff did the job:
+
+#+BEGIN_SRC c++
+#elif defined(ESP8266)
+  #include <pgmspace.h>
+  #define OLEDFONT(name) static const uint8_t name[]
+#+END_SRC
+
+Okay, time to copy over that newer (fad6a0f85fc4b241a14282e2da580b258256cf0a) PowerCube stuff
+and make some new alterations.
+
+Alright, it all seems working now.
+Remember!
+- That PROGMEM font stuff can be problematic; could be there was a mismatch
+  between the declaration and access; look into it later.
+- This particular SSD1306 (all B&W - this one doesn't have that nice yellow strip)
+  seems to work only when the SHT20 is also plugged in.
