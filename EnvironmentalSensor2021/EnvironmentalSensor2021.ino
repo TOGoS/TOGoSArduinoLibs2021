@@ -157,10 +157,7 @@ TOGoS::SSD1306::Driver ssd1306(i2c);
 
 struct ES2021Reading {
   unsigned long time;
-  // This isn't great;
-  // I just don't want to bother representing 'no data' for now.
-  TOGoS::SHT20::EverythingReading data =
-    TOGoS::SHT20::EverythingReading(TOGoS::SHT20::TemperatureReading(0), TOGoS::SHT20::HumidityReading(0));
+  TOGoS::SHT20::EverythingReading data = TOGoS::SHT20::EverythingReading();
 } latestReading;
 
 //// Stateful functions
@@ -251,13 +248,19 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     }
     digitalWrite(atoi(std::string(tcmd.args[0]).c_str()), atoi(std::string(tcmd.args[1]).c_str()));
     return CommandResult::ok();
-  } else if( tcmd.path == "sht20/retermad" ) {
+  } else if( tcmd.path == "sht20/read" ) {
     char buf[64];
     TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
     TOGoS::SHT20::EverythingReading reading = sht20.readEverything();
-    bufPrn << "temp:" << reading.getTempC() << "C" << " "
-           << "humid:" << reading.getRhPercent() << "%";
-    return CommandResult::ok(std::string(bufPrn.str()));
+    Serial << "sht20/temperature/value " << reading.temperature.value << "\n";
+    Serial << "sht20/humidity/value " << reading.humidity.value << "\n";
+    if( reading.isValid() ) {
+      bufPrn << "temp:" << reading.getTemperatureC() << "C" << " "
+             << "humid:" << reading.getRhPercent() << "%";
+      return CommandResult::ok(std::string(bufPrn.str()));
+    } else {
+      return CommandResult::failed("not connected");
+    }
   } else if( tcmd.path == "help" ) {
     Serial << "# Hello from " << APP_NAME << "!\n";
     Serial << "# \n";
@@ -350,9 +353,9 @@ void redrawReading() {
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(3,12);
-  printer.print(latestReading.data.getTempF(),1);
+  printer.print(latestReading.data.getTemperatureF(),1);
   printer << "F / ";
-  printer.print(latestReading.data.getTempC(),1);
+  printer.print(latestReading.data.getTemperatureC(),1);
   printer << "C";
   printer.clearToEndOfRow();
   
