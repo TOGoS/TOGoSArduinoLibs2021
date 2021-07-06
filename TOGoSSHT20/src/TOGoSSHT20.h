@@ -77,15 +77,6 @@ private:
   uint8_t otp_reload;
 
 public:
-  // TODO: Don't store converted values;
-  // just provide raw data and conversion functions.
-  float tempC;
-  float tempF;
-  float vpd_kPa;
-  float dew_pointC;
-  float dew_pointF;
-  float RH;
-  
   Driver(TwoWire &i2c) : i2cPort(&i2c) { };
   
   bool begin(uint8_t address=DEFAULT_ADDRESS);
