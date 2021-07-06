@@ -30,6 +30,7 @@ struct TemperatureReading
   TemperatureReading(uint16_t value) : value(value) { }
   inline float getF() const { return cToF(this->getC()); }
   inline float getC() const { return this->value * (175.72 / 65536.0) - 46.85; }
+  inline bool isValid() const { return this->value != (uint16_t)0xFFFF; }
 };
 
 struct HumidityReading
@@ -38,25 +39,31 @@ struct HumidityReading
   HumidityReading(uint16_t value) : value(value) { }
   float getRh() const { return this->value * (1.25 / 65536.0) - 0.06; }
   float getRhPercent() const { return this->value * (125.0 / 65536.0) - 6.0; }
+  inline bool isValid() const { return this->value != (uint16_t)0xFFFF; }
 };
 
 struct EverythingReading
 {
-  TemperatureReading temp;
-  HumidityReading humid;
-  EverythingReading(TemperatureReading temp, HumidityReading humid) : temp(temp), humid(humid) {}
-  TemperatureReading getTemperature() const { return this->temp; }
-  HumidityReading getHumidity() const { return this->humid; }
+  TemperatureReading temperature;
+  HumidityReading humidity;
+  EverythingReading(TemperatureReading temp, HumidityReading humid) :
+    temperature(temp), humidity(humid) {}
+  EverythingReading() : EverythingReading(0xFFFF, 0xFFFF) {}
+  TemperatureReading getTemperature() const { return this->temperature; }
+  HumidityReading getHumidity() const { return this->humidity; }
   
   // Convenience functions, because the original library
   // had similar things, but implemented in a silly way
-  inline float getTempF() const { return this->temp.getF(); }
-  inline float getTempC() const { return this->temp.getC(); }
+  inline float getTemperatureF() const { return this->temperature.getF(); }
+  inline float getTemperatureC() const { return this->temperature.getC(); }
   /** Returns relative humidity as 0.0-1.0 */
-  inline float getRh() const { return this->humid.getRh(); }
-  inline float getRhPercent() const { return this->humid.getRhPercent(); }
+  inline float getRh() const { return this->humidity.getRh(); }
+  inline float getRhPercent() const { return this->humidity.getRhPercent(); }
   float getVpdKpa() const;
   Temperature getDewPoint() const;
+  // [2021-07-06]: I'm pretty sure these values are out of range
+  // of what the SHT20 can actually return, so indiicate an invalid value:
+  bool isValid() const { return this->temperature.isValid() && this->humidity.isValid(); }
 };
 
 class Driver
@@ -81,7 +88,7 @@ public:
   
   bool begin(uint8_t address=DEFAULT_ADDRESS);
   EverythingReading readEverything();
-  bool connected();
+  bool isConnected();
 };
 
 }}

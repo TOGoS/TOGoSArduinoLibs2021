@@ -15,13 +15,13 @@
 
 /** Vapor deficit, in kPa */
 float TOGoS::SHT20::EverythingReading::getVpdKpa() const {
-  float tempC = this->getTempC();
+  float tempC = this->getTemperatureC();
   float es = 0.6108 * exp(17.27 * tempC / (tempC + 237.3));
   float ae = this->getRh() * es;
   return es - ae;
 }
 TOGoS::SHT20::Temperature TOGoS::SHT20::EverythingReading::getDewPoint() const {
-  float tem = -1.0 * this->getTempC();
+  float tem = -1.0 * this->getTemperatureC();
   float esdp = 6.112 * exp(-1.0 * 17.67 * tem / (243.5 - tem));
   float ed = this->getRh() * esdp;
   float eln = log(ed / 6.112);
@@ -36,7 +36,7 @@ bool TOGoS::SHT20::Driver::begin(uint8_t address)
 {
   this->address = address;
 
-  return connected();
+  return this->isConnected();
 }
 
 void TOGoS::SHT20::Driver::reset()
@@ -86,10 +86,10 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   lsb = Wire.read();
   TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
 
-  return TOGoS::SHT20::EverythingReading(temp, humid);
+  return TOGoS::SHT20::EverythingReading(temp, humid, this->isConnected());
 }
 
-bool TOGoS::SHT20::Driver::connected()
+bool TOGoS::SHT20::Driver::isConnected()
 {
   Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
