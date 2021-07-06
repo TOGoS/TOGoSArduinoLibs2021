@@ -1,6 +1,6 @@
 const char *APP_NAME = "EnvironmentalSensor2021";
 const char *APP_SHORT_NAME = "ES2021";
-const char *APP_VERSION = "0.0.3";
+const char *APP_VERSION = "0.0.4";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
@@ -159,8 +159,15 @@ struct ES2021Reading {
   unsigned long time;
   TOGoS::SHT20::EverythingReading data = TOGoS::SHT20::EverythingReading();
 } latestReading;
+unsigned long currentTime; // Set at beginning of each update
 
 //// Stateful functions
+
+const TOGoS::SHT20::EverythingReading &updateReading() {
+  latestReading.data = sht20.readEverything();
+  latestReading.time = currentTime;
+  return latestReading.data;
+}
 
 void blinkBuiltin(int count) {
   for( ; count > 0 ; --count ) {
@@ -251,9 +258,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
   } else if( tcmd.path == "sht20/read" ) {
     char buf[64];
     TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
-    TOGoS::SHT20::EverythingReading reading = sht20.readEverything();
-    Serial << "sht20/temperature/value " << reading.temperature.value << "\n";
-    Serial << "sht20/humidity/value " << reading.humidity.value << "\n";
+    const TOGoS::SHT20::EverythingReading &reading = updateReading();
     if( reading.isValid() ) {
       bufPrn << "temp:" << reading.getTemperatureC() << "C" << " "
              << "humid:" << reading.getRhPercent() << "%";
@@ -345,6 +350,20 @@ void redrawStalenessBar() {
   }
 }
 
+void reportReading() {
+  const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
+  Serial << "sht20/reading/age " << ((currentTime - latestReading.time) / 1000.0) << "\n";
+  if( reading.isValid() ) {
+    Serial << "sht20/connected true\n";
+    Serial << "sht20/temperature/c " << reading.getTemperatureC() << "\n";
+    Serial << "sht20/temperature/f " << reading.getTemperatureF() << "\n";
+    Serial << "sht20/humidity/percent " << reading.getRhPercent() << "\n";
+  } else {
+    Serial << "sht20/connected false\n";
+  }
+  // TODO: Report to MQTT
+}
+
 void redrawReading() {
   TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
 
@@ -353,31 +372,43 @@ void redrawReading() {
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(3,12);
-  printer.print(latestReading.data.getTemperatureF(),1);
-  printer << "F / ";
-  printer.print(latestReading.data.getTemperatureC(),1);
-  printer << "C";
+  if( latestReading.data.temperature.isValid() ) {
+    printer.print(latestReading.data.getTemperatureF(),1);
+    printer << "F / ";
+    printer.print(latestReading.data.getTemperatureC(),1);
+    printer << "C";
+  } else {
+    printer << "----";
+  }
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(4,0);
   printer << "Humidity:";
   printer.clearToEndOfRow();
-
+  
   ssd1306.gotoRowCol(5,12);
-  printer.print(latestReading.data.getRhPercent(),1);
-  printer << "%";
+  if( latestReading.data.humidity.isValid() ) {
+    printer.print(latestReading.data.getRhPercent(),1);
+    printer << "%";
+  } else {
+    printer << "----";
+  }
   printer.clearToEndOfRow();
-
+  
   ssd1306.gotoRowCol(6,0);
   printer << "VPD: ";
-  printer.print(latestReading.data.getVpdKpa(),1);
-  printer << " kPa";
+  if( latestReading.data.isValid() ) {
+    printer.print(latestReading.data.getVpdKpa(),1);
+    printer << " kPa";
+  }
   printer.clearToEndOfRow();
-
+  
   ssd1306.gotoRowCol(7,0);
-  printer << "DP : ";
-  printer.print(latestReading.data.getDewPoint().getF(),0);
-  printer << " F";
+  if( latestReading.data.isValid() ) {
+    printer << "DP : ";
+    printer.print(latestReading.data.getDewPoint().getF(),0);
+    printer << " F";
+  }
   printer.clearToEndOfRow();
 }
 
@@ -411,8 +442,10 @@ void setup() {
   latestReading.time = millis() - 100000;
 }
 
+unsigned long lastRedraw = 0;
+
 void loop() {
-  unsigned long currentTime = millis();
+  currentTime = millis();
   
   while( Serial.available() > 0 ) {
     TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
@@ -425,10 +458,14 @@ void loop() {
   mqttMaintainer.update();
 
   if( currentTime - latestReading.time > 2000 ) {
-    latestReading.data = sht20.readEverything();
-    latestReading.time = currentTime;
-    redrawStalenessBar();
+    updateReading();
+  }
+
+  if( latestReading.time > lastRedraw ) {
     redrawReading();
+    reportReading(); // TODO: Maybe separate from redraw condition
+    redrawStalenessBar();
+    lastRedraw = currentTime;
   } else {
     redrawStalenessBar();
   }
