@@ -86,7 +86,7 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   lsb = Wire.read();
   TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
 
-  return TOGoS::SHT20::EverythingReading(temp, humid, this->isConnected());
+  return TOGoS::SHT20::EverythingReading(temp, humid);
 }
 
 bool TOGoS::SHT20::Driver::isConnected()
