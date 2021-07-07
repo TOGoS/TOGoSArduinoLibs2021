@@ -1,0 +1,3 @@
+#define ES2021_POST_SETUP_CPP \
+  WiFi.begin(Y"YOUR_SSID_HERE", "YOUR_PASSWORD_HERE");                \
+  mqttMaintainer.setServer("YOUR_MQTT_SERVER_HOSTNAME_HERE", 1883, "USERNAME", "PASSWORD");
