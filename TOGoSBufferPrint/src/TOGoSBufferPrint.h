@@ -44,6 +44,12 @@ namespace TOGoS {
     StringView str() const {
       return StringView(buffer, messageEnd);
     }
+    const char *c_str() {
+      if( bufferSize == 0 ) return nullptr; // Can't nul-terminate if no buffer!
+      size_t terminatorPos = messageEnd >= bufferSize ? bufferSize-1 : messageEnd;
+      buffer[terminatorPos] = 0;
+      return buffer;
+    }
   };
 }
 
