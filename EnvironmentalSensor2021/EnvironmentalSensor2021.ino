@@ -1,6 +1,6 @@
 const char *APP_NAME = "EnvironmentalSensor2021";
 const char *APP_SHORT_NAME = "ES2021";
-const char *APP_VERSION = "0.0.4";
+const char *APP_VERSION = "0.0.6";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
@@ -13,6 +13,8 @@ const int GOING_TO_SLEEP_BLINKS = 2;
  * - 3V3 to peripherals' power +
  * - D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep)
  */
+
+#include "config.h"
 
 extern "C" {
   #include <stdlib.h> // atol
@@ -160,6 +162,10 @@ struct ES2021Reading {
   TOGoS::SHT20::EverythingReading data = TOGoS::SHT20::EverythingReading();
 } latestReading;
 unsigned long currentTime; // Set at beginning of each update
+unsigned long latestMqttPublishTime;
+
+const uint8_t PUB_SERIAL = 0x1;
+const uint8_t PUB_MQTT   = 0x2;
 
 //// Stateful functions
 
@@ -193,6 +199,7 @@ CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedComm
 
 std::string getDefaultClientId() {
   byte macAddressBuffer[6];
+  WiFi.macAddress(macAddressBuffer);
   return macAddressToHex(macAddressBuffer, ":");
 }
 
@@ -226,6 +233,12 @@ void printPins() {
   Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
 }
 
+struct Henlo {} HENLO;
+
+Print &operator<<(Print &p, const struct Henlo &hi) {
+  return p << "# Hello from " << APP_NAME << " v" << APP_VERSION << "!";
+}
+
 CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource source) {
   if( tcmd.path == "echo" ) {
     for( int i=0; i<tcmd.args.size(); ++i ) {
@@ -247,7 +260,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     printPins();
     return CommandResult::ok();
   } else if( tcmd.path == "hi" || tcmd.path == "hello" ) {
-    Serial << "# Hello from " << APP_NAME << " v" << APP_VERSION << "!\n";
+    Serial << HENLO << "\n";
     return CommandResult::ok();
   } else if( tcmd.path == "digital-write" ) {
     if( tcmd.args.size() != 2 ) {
@@ -267,7 +280,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
       return CommandResult::failed("not connected");
     }
   } else if( tcmd.path == "help" ) {
-    Serial << "# Hello from " << APP_NAME << "!\n";
+    Serial << HENLO << "\n";
     Serial << "# \n";
     Serial << "# Commands:\n";
     Serial << "#   echo $arg1 .. $argN\n";
@@ -350,22 +363,42 @@ void redrawStalenessBar() {
   }
 }
 
-void reportReading() {
+void publishAttrToMqtt(const char *attrName, const char *value) {
+  char topicBuffer[64];
+  TOGoS::BufferPrint topicPrn(topicBuffer, sizeof(topicBuffer));
+  topicPrn << getDefaultClientId() << "/" << attrName;  
+  Serial << "mqtt/publish " << topicPrn.c_str() << " " << value << "\n";
+  pubSubClient.publish(topicPrn.c_str(), value);
+}
+template <typename T>
+void publishAttrToMqtt(const char *attrName, T value) {
+  char textBuf[64];
+  TOGoS::BufferPrint bufPrn(textBuf, sizeof(textBuf));
+  bufPrn << value;
+  publishAttrToMqtt(attrName, bufPrn.c_str());
+}
+
+template <typename T>
+void publishAttr(const char *topic, T value, uint8_t dest) {
+  if( dest & PUB_SERIAL ) Serial << topic << " " << value << "\n";
+  if( dest & PUB_MQTT   ) publishAttrToMqtt(topic, value);
+}
+
+void reportReading(uint8_t dest) {
   const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
-  Serial << "sht20/reading/age " << ((currentTime - latestReading.time) / 1000.0) << "\n";
+  publishAttr("sht20/reading/age", ((currentTime - latestReading.time) / 1000.0), PUB_SERIAL);
+  publishAttr("sht20/connected", reading.isValid(), dest);
   if( reading.isValid() ) {
-    Serial << "sht20/connected true\n";
-    Serial << "sht20/temperature/c " << reading.getTemperatureC() << "\n";
-    Serial << "sht20/temperature/f " << reading.getTemperatureF() << "\n";
-    Serial << "sht20/humidity/percent " << reading.getRhPercent() << "\n";
-  } else {
-    Serial << "sht20/connected false\n";
+    publishAttr("sht20/temperature/c", reading.getTemperatureC(), dest);
+    publishAttr("sht20/temperature/f", reading.getTemperatureF(), dest);
+    publishAttr("sht20/humidity/percent", reading.getRhPercent(), dest);
   }
-  // TODO: Report to MQTT
 }
 
 void redrawReading() {
   TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+
+  // TODO: Put something on screen to show WiFi/MQTT connectivity
 
   ssd1306.gotoRowCol(2,0);
   printer << "Temperature:";
@@ -439,7 +472,12 @@ void setup() {
   Serial << "# We managed to not crash during boot!\n";
   Serial << "# Type 'help' for help.\n";
 
-  latestReading.time = millis() - 100000;
+  latestReading.time    = millis() - 100000;
+  latestMqttPublishTime = millis() - 100000;
+
+#ifdef ES2021_POST_SETUP_CPP
+  ES2021_POST_SETUP_CPP
+#endif
 }
 
 unsigned long lastRedraw = 0;
@@ -457,13 +495,21 @@ void loop() {
   delay(10);
   mqttMaintainer.update();
 
-  if( currentTime - latestReading.time > 2000 ) {
+  if( currentTime - latestReading.time > 15000 ) {
     updateReading();
   }
 
   if( latestReading.time > lastRedraw ) {
     redrawReading();
-    reportReading(); // TODO: Maybe separate from redraw condition
+    bool publishToMqtt = currentTime - latestMqttPublishTime > 15000;
+    uint8_t pubDest = PUB_SERIAL;
+    if( publishToMqtt && mqttMaintainer.isConnected() ) {
+      pubDest |= PUB_MQTT;
+      Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
+      latestMqttPublishTime = currentTime; // Assuming we really are connected lmao
+    }
+    reportReading(pubDest); // TODO: Maybe separate from redraw condition
+    Serial << "\n";
     redrawStalenessBar();
     lastRedraw = currentTime;
   } else {
