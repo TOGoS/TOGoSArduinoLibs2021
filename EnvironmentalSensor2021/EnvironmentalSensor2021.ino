@@ -1,6 +1,6 @@
 const char *APP_NAME = "EnvironmentalSensor2021";
 const char *APP_SHORT_NAME = "ES2021";
-const char *APP_VERSION = "0.0.6";
+const char *APP_VERSION = "0.0.7";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
