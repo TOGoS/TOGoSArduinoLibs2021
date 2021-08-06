@@ -67,6 +67,13 @@ char hexDigit(int num) {
   return '?'; // Should be unpossible
 }
 
+std::string hexByte(int num) {
+  std::string hecks;
+  hecks += hexDigit(num >> 4);
+  hecks += hexDigit(num);
+  return hecks;
+}
+
 std::string macAddressToHex(uint8_t *macAddress, const char *octetSeparator) {
   std::string hecks;
   for( int i = 0; i < 6; ++i ) {
@@ -348,6 +355,28 @@ void drawBackground() {
   ssd1306.clear();
   ssd1306.gotoRowCol(0,0);
   printer << APP_SHORT_NAME << " " << APP_VERSION;
+  
+  drawConnectionIndicators();
+}
+
+// TODO: Have a method on printer to print arbitrary glyphs
+uint8_t wifiIcon[]   = { 0x02, 0x09, 0x05, 0x55, 0x05, 0x09, 0x02, 0x00 };
+uint8_t noWifiIcon[] = { 0x00, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00 };
+
+void printGlyph(TOGoS::SSD1306::Driver &driver, const uint8_t *data, int size) {
+  for( int i=0; i<size; ++i ) {
+    driver.sendData(data[i]);
+  }
+}
+
+void drawConnectionIndicators() {
+  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+  
+  ssd1306.gotoRowCol(0,112);
+  printGlyph(ssd1306, WiFi.status() == WL_CONNECTED ? wifiIcon : noWifiIcon, 8);
+  
+  ssd1306.gotoRowCol(0,120);
+  printer << (mqttMaintainer.isConnected() ? "M" : ".");
 }
 
 void redrawStalenessBar() {
@@ -445,6 +474,42 @@ void redrawReading() {
   printer.clearToEndOfRow();
 }
 
+// TODO: Make a class in TOGoSArduinoLibs that does this
+struct WiFiCredz {
+  const char *ssid;
+  const char *password;
+  WiFiCredz(const char *ssid, const char *password) : ssid(ssid), password(password) {}
+};
+
+std::vector<WiFiCredz> wifiNetworks;
+int wifiNetworkIndex = -1;
+unsigned long lastWifiReconnectAttempt = 0;
+
+void wifiUpdate() {
+  int status = WiFi.status();
+  if( status != WL_CONNECTED && status != WL_IDLE_STATUS &&
+      currentTime - lastWifiReconnectAttempt > 5000 && wifiNetworks.size() > 0 ) {
+    ++wifiNetworkIndex;
+    if( wifiNetworkIndex >= wifiNetworks.size() ) {
+      wifiNetworkIndex = 0;
+    }
+
+    const WiFiCredz &credz = wifiNetworks[wifiNetworkIndex];
+    Serial << "# Attempting auto-connect to " << credz.ssid << "...\n";
+    WiFi.begin(credz.ssid, credz.password);
+    lastWifiReconnectAttempt = currentTime;
+  }
+}
+
+// Use these in your ES2021_POST_SETUP_CPP, if you like:
+
+inline void addWifiNetwork(const char *ssid, const char *password) {
+  wifiNetworks.emplace_back(ssid, password);
+}
+inline void setMqttServer(const char *hostName, uint16_t port, const char *username, const char *password) {
+  mqttMaintainer.setServer(hostName, port, username, password);
+}
+
 void setup() {
   delay(500); // Standard 'give me time to reprogram it' delay in case the program messes up some I/O pins
   Serial.begin(115200);
@@ -462,8 +527,8 @@ void setup() {
   sht20.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
 
-  Serial << "# Initializing SSD1306...\n";
-  ssd1306.begin(0x3C);
+  Serial << "# Initializing SSD1306 (0x" << hexByte(SSD1306_ADDRESS) << ")...\n";
+  ssd1306.begin(SSD1306_ADDRESS);
   Serial << "# And writing to it...\n";
   ssd1306.displayOn();
   ssd1306.setBrightness(255);
@@ -481,6 +546,7 @@ void setup() {
 }
 
 unsigned long lastRedraw = 0;
+unsigned long lastConnectionRedraw = 0;
 
 void loop() {
   currentTime = millis();
@@ -499,6 +565,11 @@ void loop() {
     updateReading();
   }
 
+  if( currentTime - lastConnectionRedraw > 1000 ) {
+    drawConnectionIndicators();
+    lastConnectionRedraw = currentTime;
+  }
+
   if( latestReading.time > lastRedraw ) {
     redrawReading();
     bool publishToMqtt = currentTime - latestMqttPublishTime > 15000;
@@ -515,4 +586,6 @@ void loop() {
   } else {
     redrawStalenessBar();
   }
+
+  wifiUpdate();
 }
