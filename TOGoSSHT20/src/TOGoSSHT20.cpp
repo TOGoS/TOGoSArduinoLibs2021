@@ -41,23 +41,23 @@ bool TOGoS::SHT20::Driver::begin(uint8_t address)
 
 void TOGoS::SHT20::Driver::reset()
 {
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_RESET);
-  Wire.endTransmission();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_RESET);
+  this->i2cPort->endTransmission();
   delay(SOFT_RESET_DELAY);
   this->onchip_heater = _DISABLE_ONCHIP_HEATER;
   this->otp_reload = _DISABLE_OTP_RELOAD;
 
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_READ_USER_REG);
-  Wire.endTransmission();
-  Wire.requestFrom(this->address, (uint8_t)1);
-  uint8_t config = Wire.read();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_READ_USER_REG);
+  this->i2cPort->endTransmission();
+  this->i2cPort->requestFrom(this->address, (uint8_t)1);
+  uint8_t config = this->i2cPort->read();
   config = ((config & _RESERVED_BITMASK) | this->resolution | this->onchip_heater | this->otp_reload);
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_WRITE_USER_REG);
-  Wire.write(config);
-  Wire.endTransmission();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_WRITE_USER_REG);
+  this->i2cPort->write(config);
+  this->i2cPort->endTransmission();
 }
 
 TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
@@ -67,23 +67,23 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   uint8_t lsb, msb;
   
   this->reset();
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_TEMP);
-  Wire.endTransmission();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_TEMP);
+  this->i2cPort->endTransmission();
   delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(this->address, (uint8_t)2);
-  msb = Wire.read();
-  lsb = Wire.read();
+  this->i2cPort->requestFrom(this->address, (uint8_t)2);
+  msb = this->i2cPort->read();
+  lsb = this->i2cPort->read();
   TOGoS::SHT20::TemperatureReading temp(msb << 8 | lsb);
 
   this->reset();
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_HUMID);
-  Wire.endTransmission();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_HUMID);
+  this->i2cPort->endTransmission();
   delay(HUMIDITY_DELAY);
-  Wire.requestFrom(this->address, (uint8_t)2);
-  msb = Wire.read();
-  lsb = Wire.read();
+  this->i2cPort->requestFrom(this->address, (uint8_t)2);
+  msb = this->i2cPort->read();
+  lsb = this->i2cPort->read();
   TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
 
   return TOGoS::SHT20::EverythingReading(temp, humid);
@@ -91,11 +91,11 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
 
 bool TOGoS::SHT20::Driver::isConnected()
 {
-  Wire.beginTransmission(this->address);
-  Wire.write(SHT20_READ_USER_REG);
-  Wire.endTransmission();
-  Wire.requestFrom(this->address, (uint8_t)1);
-  uint8_t config = Wire.read();
+  this->i2cPort->beginTransmission(this->address);
+  this->i2cPort->write(SHT20_READ_USER_REG);
+  this->i2cPort->endTransmission();
+  this->i2cPort->requestFrom(this->address, (uint8_t)1);
+  uint8_t config = this->i2cPort->read();
   
   if (config != 0xFF) {
     return true;
