@@ -51,7 +51,7 @@ void TOGoS::SHT20::Driver::reset()
   Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
   Wire.endTransmission();
-  Wire.requestFrom(this->address, 1);
+  Wire.requestFrom(this->address, (uint8_t)1);
   uint8_t config = Wire.read();
   config = ((config & _RESERVED_BITMASK) | this->resolution | this->onchip_heater | this->otp_reload);
   Wire.beginTransmission(this->address);
@@ -71,7 +71,7 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   Wire.write(SHT20_TEMP);
   Wire.endTransmission();
   delay(TEMPERATURE_DELAY);
-  Wire.requestFrom(this->address, 2);
+  Wire.requestFrom(this->address, (uint8_t)2);
   msb = Wire.read();
   lsb = Wire.read();
   TOGoS::SHT20::TemperatureReading temp(msb << 8 | lsb);
@@ -81,7 +81,7 @@ TOGoS::SHT20::EverythingReading TOGoS::SHT20::Driver::readEverything() {
   Wire.write(SHT20_HUMID);
   Wire.endTransmission();
   delay(HUMIDITY_DELAY);
-  Wire.requestFrom(this->address, 2);
+  Wire.requestFrom(this->address, (uint8_t)2);
   msb = Wire.read();
   lsb = Wire.read();
   TOGoS::SHT20::HumidityReading humid(msb << 8 | lsb);
@@ -94,7 +94,7 @@ bool TOGoS::SHT20::Driver::isConnected()
   Wire.beginTransmission(this->address);
   Wire.write(SHT20_READ_USER_REG);
   Wire.endTransmission();
-  Wire.requestFrom(this->address, 1);
+  Wire.requestFrom(this->address, (uint8_t)1);
   uint8_t config = Wire.read();
   
   if (config != 0xFF) {
