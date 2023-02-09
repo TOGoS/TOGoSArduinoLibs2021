@@ -1,2 +1,6 @@
+** TODO TOGoSCommand: Separate out things that depend on other libraries, like PubSubClient
+
+Because when you load the library, Arduino tries to compile everything in it.
+
 ** TODO TOGoSCommand/examples/MQTTOrSerialCommand : handle MQTT commands in MQTTOr
 ** TODO TOGoSCommand/examples/MQTTOrSerialCommand : a way to store a 'boot' script to EEPROM
