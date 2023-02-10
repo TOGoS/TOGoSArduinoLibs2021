@@ -19,9 +19,6 @@ public:
 	}
 };
 
-/** Time at which the relay should switch back to its default state */
-long timerResetMillis = 0;
-
 void printHelp() {
 	Serial << "# Welcome to " << APP_NAME << "\n";
 	Serial << "# Commands:\n";
@@ -46,6 +43,20 @@ void printPins() {
 }
 
 TLIBuffer commandBuffer;
+
+/** Time at which the relay should switch back to its default state, in millis */
+unsigned long relayResetTime = 0;
+unsigned long currentTickTime = 0;
+unsigned long shortPressTimerIncrement = 1000*3600;
+
+void shortPress() {
+	if( relayResetTime < currentTickTime ) {
+		relayResetTime = currentTickTime;
+	}
+	relayResetTime += shortPressTimerIncrement;
+	long minutesUntil = (relayResetTime - currentTickTime) / 60000;
+	Serial << "# " << minutesUntil << " minutes until reset\n";
+}
 
 void processLine(const TOGoS::StringView& line) {
 	if( line.size() == 0 ) return;
@@ -72,6 +83,8 @@ void processLine(const TOGoS::StringView& line) {
 		printHelp();
 	} else if( tcmd.path == "pins" ) {
 		printPins();
+	} else if( tcmd.path == "button/short-press" ) {
+		shortPress();
 	}
 }
 
@@ -85,7 +98,20 @@ void setup() {
 	pinMode(BUTTON_PIN, INPUT);
 }
 
+int buttonIndicatorPhase = 0;
+
 void loop() {
+	currentTickTime = millis();
+	if( relayResetTime > currentTickTime ) {
+		// 512 ticks to indicate...up to 12 hours?
+		// So uhm, 12*3600*1000 / 512 = (/ (* 12 3600 1000.0) 512) = 84375
+		long timeUntil = (relayResetTime - currentTickTime) / 84375;
+		digitalWrite(LED_BUILTIN, (buttonIndicatorPhase & 0x1FF) < timeUntil ? LOW : HIGH);
+	}
+	if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
+		long minutesUntil = relayResetTime > currentTickTime ? (relayResetTime-currentTickTime) / 60000 : 0;
+		Serial << "# Timer: " << minutesUntil << " minutes left.\n";
+	}
 	while( Serial.available() > 0 ) {
 		TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
 		if( bufState == TLIBuffer::BufferState::READY ) {
@@ -94,4 +120,5 @@ void loop() {
 		}
 	}
 	delay(10);
+	++buttonIndicatorPhase;
 }
