@@ -57,6 +57,10 @@ void shortPress() {
 	long minutesUntil = (relayResetTime - currentTickTime) / 60000;
 	Serial << "# " << minutesUntil << " minutes until reset\n";
 }
+void longPress() {
+	relayResetTime = currentTickTime;
+	Serial << "# Cleared timer; switch off\n";
+}
 
 void processLine(const TOGoS::StringView& line) {
 	if( line.size() == 0 ) return;
@@ -85,6 +89,8 @@ void processLine(const TOGoS::StringView& line) {
 		printPins();
 	} else if( tcmd.path == "button/short-press" ) {
 		shortPress();
+	} else if( tcmd.path == "button/long-press" ) {
+		longPress();
 	}
 }
 
@@ -100,14 +106,20 @@ void setup() {
 
 int buttonIndicatorPhase = 0;
 
+Relay<RELAY_CONTROL_PIN, true> theRelay;
+
+const unsigned long indicatorMaxHours = 8;
+const unsigned long indicatorCycleTicks = 512;
+const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
+
 void loop() {
 	currentTickTime = millis();
-	if( relayResetTime > currentTickTime ) {
-		// 512 ticks to indicate...up to 12 hours?
-		// So uhm, 12*3600*1000 / 512 = (/ (* 12 3600 1000.0) 512) = 84375
-		long timeUntil = (relayResetTime - currentTickTime) / 84375;
-		digitalWrite(LED_BUILTIN, (buttonIndicatorPhase & 0x1FF) < timeUntil ? LOW : HIGH);
-	}
+	bool active = relayResetTime > currentTickTime;
+	long indicatorOnDutyCycle = active ? (relayResetTime - currentTickTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
+	bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
+	bool indicatorOn = (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
+	digitalWrite(LED_BUILTIN, indicatorOn ? LOW : HIGH);
+	theRelay.set(active);
 	if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
 		long minutesUntil = relayResetTime > currentTickTime ? (relayResetTime-currentTickTime) / 60000 : 0;
 		Serial << "# Timer: " << minutesUntil << " minutes left.\n";
