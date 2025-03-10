@@ -8,6 +8,8 @@
 // library and have separate applications instantiate them with
 // different parameters.  Hmm.
 
+#include <optional>
+
 #include <TOGoSCommand.h>
 #include <TOGoS/Command/ParseResult.h>
 #include <TOGoS/Command/TLIBuffer.h>
@@ -43,7 +45,7 @@ namespace TOGoS::Arduino::RelayTimer {
 			return digitalRead(pin) == (activeLow ? LOW : HIGH);
 		}
 	};
-
+	
 	enum SBInputEvent {
 		SHORT_PRESS = 1,
 		LONG_PRESS = 2,
@@ -52,6 +54,7 @@ namespace TOGoS::Arduino::RelayTimer {
 	class Timer {
 	public:
 		virtual const char *getName() = 0;
+		virtual void reset(unsigned long currentTime) = 0;
 		virtual void input(SBInputEvent type, unsigned long currentTime) = 0;
 		virtual bool isRelayOnAt(unsigned long currentTime) = 0;
 		virtual bool isIndicatorOnAt(unsigned long currentTime) = 0;
@@ -62,9 +65,12 @@ namespace TOGoS::Arduino::RelayTimer {
 		unsigned long resetTime = 0;
 		unsigned long activeDuration = 0;
 		unsigned long shortPressTimerIncrement = 1000*3600;
-		virtual const char *getName() {
+		const char *getName() {
 			return "OneShotTimer";
 		};
+		void reset(unsigned long currentTime) {
+			this->resetTime = currentTime;
+		}
 		void input(SBInputEvent type, unsigned long currentTime) {
 			switch( type ) {
 			case SBInputEvent::SHORT_PRESS:
@@ -105,14 +111,38 @@ namespace TOGoS::Arduino::RelayTimer {
 			return (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
 		}
 	};
-	/*
+	
 	class LoopTimer : Timer {
 	public:
 		unsigned long cycleStartTime = 0;
-		unsigned long cycleDuration = 3600*24;
-		unsigned long activeDuration = 0;
+		unsigned long cycleDuration  = 3600*1000*24;
+		unsigned long activeDuration = 3600*1000*12;
+		const char *getName() {
+			return "LoopTimer";
+		};
+		void reset(unsigned long currentTime) {
+			this->cycleStartTime = currentTime;
+		}
+		void input(SBInputEvent type, unsigned long currentTime) {
+			switch( type ) {
+			case SBInputEvent::SHORT_PRESS:
+				this->cycleStartTime = currentTime;
+				Serial << "# Jump to on time\n";
+				break;
+			case SBInputEvent::LONG_PRESS:
+				this->cycleStartTime = currentTime - activeDuration;
+				Serial << "# Jump to off time\n";
+				break;
+			}
+		}
+		bool isRelayOnAt(unsigned long currentTime) {
+			long phase = (currentTime - this->cycleStartTime) % this->cycleDuration;
+			return phase < this->activeDuration;
+		}
+		bool isIndicatorOnAt(unsigned long currentTime) {
+			return this->isRelayOnAt(currentTime);
+		}
 	};
-	*/
 }
 
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
@@ -122,7 +152,17 @@ using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 using SBInputEvent = TOGoS::Arduino::RelayTimer::SBInputEvent;
 
-TOGoS::Arduino::RelayTimer::Timer *theTimer = new TOGoS::Arduino::RelayTimer::OneShotTimer();
+TOGoS::Arduino::RelayTimer::Timer *theTimer =
+	appConfig.timerMode == TOGoS::Arduino::RelayTimer::TimerMode::ONE_SHOT ? (TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::OneShotTimer() :
+	(TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::LoopTimer();
+
+std::optional<long> buttonDownTime = {};
+unsigned long currentTickTime = 0;
+std::optional<bool> previousRelayState = false;
+
+TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
+TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
+
 
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
@@ -153,11 +193,6 @@ void printConstants() {
 }
 
 TLIBuffer commandBuffer;
-
-/** Time at which the relay should switch back to its default state, in millis */
-unsigned long relayResetTime = 0;
-unsigned long currentTickTime = 0;
-unsigned long shortPressTimerIncrement = 1000*3600;
 
 void processLine(const TOGoS::StringView& line) {
 	if( line.size() == 0 ) return;
@@ -199,23 +234,22 @@ void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);
 	pinMode(appConfig.relayControlPin, OUTPUT);
 	pinMode(appConfig.buttonPin, INPUT);
+	
+	currentTickTime = millis();
+	Serial << "# Resetting timer at " << currentTickTime << "\n";
+	theTimer->reset(currentTickTime);
 }
-
-TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
-TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
-
-long buttonDownTime = -1;
 
 void loop() {
 	currentTickTime = millis();
-
+	
 	if( theButton.isPressed() ) {
-		if( buttonDownTime == -1 ) {
+		if( !buttonDownTime.has_value() ) {
 			buttonDownTime = currentTickTime;
 		}
 	} else {
-		if( buttonDownTime != -1 ) {
-			long buttonPressTime = currentTickTime - buttonDownTime;
+		if( buttonDownTime.has_value() ) {
+			long buttonPressTime = currentTickTime - *buttonDownTime;
 			if( buttonPressTime < 100 ) {
 				// Ignore
 			} else {
@@ -227,12 +261,17 @@ void loop() {
 				}
 			}
 			
-			buttonDownTime = -1;
+			buttonDownTime = {};
 		}
 	}
 	
 	digitalWrite(LED_BUILTIN, theTimer->isIndicatorOnAt(currentTickTime) ? LOW : HIGH);
-	theRelay.set(theTimer->isRelayOnAt(currentTickTime));
+	bool shouldRelayBeOn = theTimer->isRelayOnAt(currentTickTime);
+	if( !previousRelayState.has_value() || shouldRelayBeOn != *previousRelayState ) {
+		Serial << "# Switching relay " << (shouldRelayBeOn ? "on" : "off") << "\n";
+		theRelay.set(shouldRelayBeOn);
+		previousRelayState = shouldRelayBeOn;
+	}
 	while( Serial.available() > 0 ) {
 		TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
 		if( bufState == TLIBuffer::BufferState::READY ) {
