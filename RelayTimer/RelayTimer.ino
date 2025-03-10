@@ -43,6 +43,76 @@ namespace TOGoS::Arduino::RelayTimer {
 			return digitalRead(pin) == (activeLow ? LOW : HIGH);
 		}
 	};
+
+	enum SBInputEvent {
+		SHORT_PRESS = 1,
+		LONG_PRESS = 2,
+	};
+
+	class Timer {
+	public:
+		virtual const char *getName() = 0;
+		virtual void input(SBInputEvent type, unsigned long currentTime) = 0;
+		virtual bool isRelayOnAt(unsigned long currentTime) = 0;
+		virtual bool isIndicatorOnAt(unsigned long currentTime) = 0;
+	};
+
+	class OneShotTimer : public Timer {
+	public:
+		unsigned long resetTime = 0;
+		unsigned long activeDuration = 0;
+		unsigned long shortPressTimerIncrement = 1000*3600;
+		virtual const char *getName() {
+			return "OneShotTimer";
+		};
+		void input(SBInputEvent type, unsigned long currentTime) {
+			switch( type ) {
+			case SBInputEvent::SHORT_PRESS:
+				{
+					if( this->resetTime < currentTime ) {
+						this->resetTime = currentTime;
+					}
+					this->resetTime += shortPressTimerIncrement;
+					long minutesUntil = (this->resetTime - currentTime) / 60000;
+					Serial << "# " << minutesUntil << " minutes until reset\n";
+				}
+				break;
+			case SBInputEvent::LONG_PRESS:
+				this->resetTime = currentTime;
+				Serial << "# Cleared timer; switch off\n";
+				break;
+			}
+		}
+		bool isRelayOnAt(unsigned long currentTime) {
+			return currentTime < this->resetTime;
+		}
+		bool isIndicatorOnAt(unsigned long currentTime) {
+			const unsigned long indicatorMaxHours = 8;
+			const unsigned long indicatorCycleTicks = 512;
+			const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
+		
+			int buttonIndicatorPhase = (int)(currentTime / 10);
+		
+			if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
+				long minutesUntil = this->resetTime > currentTime ? (this->resetTime-currentTime) / 60000 : 0;
+				Serial << "# Timer: " << minutesUntil << " minutes left.\n";
+			}
+
+			bool active = this->resetTime > currentTime;
+			// BUILTIN_LED flashes the number of hours left
+			long indicatorOnDutyCycle = active ? (this->resetTime - currentTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
+			bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
+			return (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
+		}
+	};
+	/*
+	class LoopTimer : Timer {
+	public:
+		unsigned long cycleStartTime = 0;
+		unsigned long cycleDuration = 3600*24;
+		unsigned long activeDuration = 0;
+	};
+	*/
 }
 
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
@@ -50,79 +120,9 @@ namespace TOGoS::Arduino::RelayTimer {
 
 using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
+using SBInputEvent = TOGoS::Arduino::RelayTimer::SBInputEvent;
 
-enum RTInputEvent {
-	SHORT_PRESS = 1,
-	LONG_PRESS = 2,
-};
-
-class Timer {
-public:
-	virtual const char *getName() = 0;
-	virtual void input(RTInputEvent type, unsigned long currentTime) = 0;
-	virtual bool isRelayOnAt(unsigned long currentTime) = 0;
-	virtual bool isIndicatorOnAt(unsigned long currentTime) = 0;
-};
-
-class OneShotTimer : public Timer {
-public:
-	unsigned long resetTime = 0;
-	unsigned long activeDuration = 0;
-	unsigned long shortPressTimerIncrement = 1000*3600;
-	virtual const char *getName() {
-		return "OneShotTimer";
-	};
-	void input(RTInputEvent type, unsigned long currentTime) {
-		switch( type ) {
-		case RTInputEvent::SHORT_PRESS:
-			{
-				if( this->resetTime < currentTime ) {
-					this->resetTime = currentTime;
-				}
-				this->resetTime += shortPressTimerIncrement;
-				long minutesUntil = (this->resetTime - currentTime) / 60000;
-				Serial << "# " << minutesUntil << " minutes until reset\n";
-			}
-			break;
-		case RTInputEvent::LONG_PRESS:
-			this->resetTime = currentTime;
-			Serial << "# Cleared timer; switch off\n";
-			break;
-		}
-	}
-   bool isRelayOnAt(unsigned long currentTime) {
-		return currentTime < this->resetTime;
-	}
-	bool isIndicatorOnAt(unsigned long currentTime) {
-		const unsigned long indicatorMaxHours = 8;
-		const unsigned long indicatorCycleTicks = 512;
-		const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
-		
-		int buttonIndicatorPhase = (int)(currentTime / 10);
-		
-		if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
-			long minutesUntil = this->resetTime > currentTime ? (this->resetTime-currentTime) / 60000 : 0;
-			Serial << "# Timer: " << minutesUntil << " minutes left.\n";
-		}
-
-		bool active = this->resetTime > currentTime;
-		// BUILTIN_LED flashes the number of hours left
-		long indicatorOnDutyCycle = active ? (this->resetTime - currentTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
-		bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
-		return (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
-	}
-};
-
-/*
-class LoopTimer : Timer {
-public:
-	unsigned long cycleStartTime = 0;
-	unsigned long cycleDuration = 3600*24;
-	unsigned long activeDuration = 0;
-};
-*/
-
-Timer *theTimer = new OneShotTimer();
+TOGoS::Arduino::RelayTimer::Timer *theTimer = new TOGoS::Arduino::RelayTimer::OneShotTimer();
 
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
@@ -185,9 +185,9 @@ void processLine(const TOGoS::StringView& line) {
 	} else if( tcmd.path == "constants" || tcmd.path == "pins" ) {
 		printConstants();
 	} else if( tcmd.path == "button/short-press" ) {
-		theTimer->input(RTInputEvent::SHORT_PRESS, currentTickTime);
+		theTimer->input(SBInputEvent::SHORT_PRESS, currentTickTime);
 	} else if( tcmd.path == "button/long-press" ) {
-		theTimer->input(RTInputEvent::LONG_PRESS, currentTickTime);
+		theTimer->input(SBInputEvent::LONG_PRESS, currentTickTime);
 	}
 }
 
@@ -221,9 +221,9 @@ void loop() {
 			} else {
 				Serial << "# Button was held down for " << buttonPressTime << "ms\n";
 				if( buttonPressTime < 500 ) {
-					theTimer->input(RTInputEvent::SHORT_PRESS, currentTickTime);
+					theTimer->input(SBInputEvent::SHORT_PRESS, currentTickTime);
 				} else {
-					theTimer->input(RTInputEvent::LONG_PRESS, currentTickTime);
+					theTimer->input(SBInputEvent::LONG_PRESS, currentTickTime);
 				}
 			}
 			
