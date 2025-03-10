@@ -1,3 +1,13 @@
+// This should be a very simple program
+// I may be overengineering it.
+// 
+// [2025-03-09]: For one thing, trying to make it be both a one-shot
+// timer and a loopy one.  I guess I figure the two applications are
+// similar enough tto share all the boilerplate for commands and
+// stuff.  But then maybe I should put all the shared bits in a
+// library and have separate applications instantiate them with
+// different parameters.  Hmm.
+
 #include <TOGoSCommand.h>
 #include <TOGoS/Command/ParseResult.h>
 #include <TOGoS/Command/TLIBuffer.h>
@@ -41,6 +51,79 @@ namespace TOGoS::Arduino::RelayTimer {
 using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 
+enum RTInputEvent {
+	SHORT_PRESS = 1,
+	LONG_PRESS = 2,
+};
+
+class Timer {
+public:
+	virtual const char *getName() = 0;
+	virtual void input(RTInputEvent type, unsigned long currentTime) = 0;
+	virtual bool isRelayOnAt(unsigned long currentTime) = 0;
+	virtual bool isIndicatorOnAt(unsigned long currentTime) = 0;
+};
+
+class OneShotTimer : public Timer {
+public:
+	unsigned long resetTime = 0;
+	unsigned long activeDuration = 0;
+	unsigned long shortPressTimerIncrement = 1000*3600;
+	virtual const char *getName() {
+		return "OneShotTimer";
+	};
+	void input(RTInputEvent type, unsigned long currentTime) {
+		switch( type ) {
+		case RTInputEvent::SHORT_PRESS:
+			{
+				if( this->resetTime < currentTime ) {
+					this->resetTime = currentTime;
+				}
+				this->resetTime += shortPressTimerIncrement;
+				long minutesUntil = (this->resetTime - currentTime) / 60000;
+				Serial << "# " << minutesUntil << " minutes until reset\n";
+			}
+			break;
+		case RTInputEvent::LONG_PRESS:
+			this->resetTime = currentTime;
+			Serial << "# Cleared timer; switch off\n";
+			break;
+		}
+	}
+   bool isRelayOnAt(unsigned long currentTime) {
+		return currentTime < this->resetTime;
+	}
+	bool isIndicatorOnAt(unsigned long currentTime) {
+		const unsigned long indicatorMaxHours = 8;
+		const unsigned long indicatorCycleTicks = 512;
+		const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
+		
+		int buttonIndicatorPhase = (int)(currentTime / 10);
+		
+		if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
+			long minutesUntil = this->resetTime > currentTime ? (this->resetTime-currentTime) / 60000 : 0;
+			Serial << "# Timer: " << minutesUntil << " minutes left.\n";
+		}
+
+		bool active = this->resetTime > currentTime;
+		// BUILTIN_LED flashes the number of hours left
+		long indicatorOnDutyCycle = active ? (this->resetTime - currentTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
+		bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
+		return (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
+	}
+};
+
+/*
+class LoopTimer : Timer {
+public:
+	unsigned long cycleStartTime = 0;
+	unsigned long cycleDuration = 3600*24;
+	unsigned long activeDuration = 0;
+};
+*/
+
+Timer *theTimer = new OneShotTimer();
+
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
 	Serial << "# Commands:\n";
@@ -65,6 +148,8 @@ void printConstants() {
   Serial << "# Other constants:\n";
   Serial << "#  HIGH = " << HIGH << "\n";
   Serial << "#  LOW  = " << LOW << "\n";
+  Serial << "# Timer:\n";
+  Serial << "#  name = " << theTimer->getName() << "\n";
 }
 
 TLIBuffer commandBuffer;
@@ -73,19 +158,6 @@ TLIBuffer commandBuffer;
 unsigned long relayResetTime = 0;
 unsigned long currentTickTime = 0;
 unsigned long shortPressTimerIncrement = 1000*3600;
-
-void shortPress() {
-	if( relayResetTime < currentTickTime ) {
-		relayResetTime = currentTickTime;
-	}
-	relayResetTime += shortPressTimerIncrement;
-	long minutesUntil = (relayResetTime - currentTickTime) / 60000;
-	Serial << "# " << minutesUntil << " minutes until reset\n";
-}
-void longPress() {
-	relayResetTime = currentTickTime;
-	Serial << "# Cleared timer; switch off\n";
-}
 
 void processLine(const TOGoS::StringView& line) {
 	if( line.size() == 0 ) return;
@@ -113,9 +185,9 @@ void processLine(const TOGoS::StringView& line) {
 	} else if( tcmd.path == "constants" || tcmd.path == "pins" ) {
 		printConstants();
 	} else if( tcmd.path == "button/short-press" ) {
-		shortPress();
+		theTimer->input(RTInputEvent::SHORT_PRESS, currentTickTime);
 	} else if( tcmd.path == "button/long-press" ) {
-		longPress();
+		theTimer->input(RTInputEvent::LONG_PRESS, currentTickTime);
 	}
 }
 
@@ -129,14 +201,8 @@ void setup() {
 	pinMode(appConfig.buttonPin, INPUT);
 }
 
-int buttonIndicatorPhase = 0;
-
 TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
 TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
-
-const unsigned long indicatorMaxHours = 8;
-const unsigned long indicatorCycleTicks = 512;
-const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
 
 long buttonDownTime = -1;
 
@@ -155,9 +221,9 @@ void loop() {
 			} else {
 				Serial << "# Button was held down for " << buttonPressTime << "ms\n";
 				if( buttonPressTime < 500 ) {
-					shortPress();
+					theTimer->input(RTInputEvent::SHORT_PRESS, currentTickTime);
 				} else {
-					longPress();
+					theTimer->input(RTInputEvent::LONG_PRESS, currentTickTime);
 				}
 			}
 			
@@ -165,17 +231,8 @@ void loop() {
 		}
 	}
 	
-	bool active = relayResetTime > currentTickTime;
-	// BUILTIN_LED flashes the number of hours left
-	long indicatorOnDutyCycle = active ? (relayResetTime - currentTickTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
-	bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
-	bool indicatorOn = (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);
-	digitalWrite(LED_BUILTIN, indicatorOn ? LOW : HIGH);
-	theRelay.set(active);
-	if( (buttonIndicatorPhase & 0x3FF) == 0 ) {
-		long minutesUntil = relayResetTime > currentTickTime ? (relayResetTime-currentTickTime) / 60000 : 0;
-		Serial << "# Timer: " << minutesUntil << " minutes left.\n";
-	}
+	digitalWrite(LED_BUILTIN, theTimer->isIndicatorOnAt(currentTickTime) ? LOW : HIGH);
+	theRelay.set(theTimer->isRelayOnAt(currentTickTime));
 	while( Serial.available() > 0 ) {
 		TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
 		if( bufState == TLIBuffer::BufferState::READY ) {
@@ -184,5 +241,4 @@ void loop() {
 		}
 	}
 	delay(10);
-	++buttonIndicatorPhase;
 }

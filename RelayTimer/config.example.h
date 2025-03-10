@@ -6,4 +6,6 @@ constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.relayIsActiveLow = true,
 	.buttonPin = D7,
 	.buttonIsActiveLow = true,
+	// ONE_SHOT or LOOPING
+	.timerMode = TOGoS::Arduino::RelayTimer::ONE_SHOT,
 };
