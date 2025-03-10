@@ -4,14 +4,20 @@
 #include <TOGoS/Command/TokenizedCommand.h>
 #include <TOGoSStreamOperators.h>
 
-#define APP_NAME "RelayTimer.ino"
-
-#include "config.h"
-
-using TLIBuffer = TOGoS::Command::TLIBuffer;
-using TokenizedCommand = TOGoS::Command::TokenizedCommand;
-
 namespace TOGoS::Arduino::RelayTimer {
+	enum TimerMode {
+		ONE_SHOT,
+		LOOPING
+	};
+	struct AppConfig {
+		const char *appName;
+		int relayControlPin;
+		bool relayIsActiveLow;
+		int buttonPin;
+		bool buttonIsActiveLow;
+		TimerMode timerMode;
+	};
+	
 	template <int pin, bool activeLow>
 	class Relay {
 	public:
@@ -29,8 +35,14 @@ namespace TOGoS::Arduino::RelayTimer {
 	};
 }
 
+// config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
+#include "config.h"
+
+using TLIBuffer = TOGoS::Command::TLIBuffer;
+using TokenizedCommand = TOGoS::Command::TokenizedCommand;
+
 void printHelp() {
-	Serial << "# Welcome to " << APP_NAME << "\n";
+	Serial << "# Welcome to " << appConfig.appName << "\n";
 	Serial << "# Commands:\n";
 	Serial << "#   echo ... ; echo stuff back to serial\n";
 	Serial << "#   pins     ; dump hardware pin numbers\n";
@@ -48,8 +60,8 @@ void printConstants() {
   Serial << "#  D7 = " << D7 << "\n";
   Serial << "#  D8 = " << D8 << "\n";
   Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
-  Serial << "#  RELAY_CONTROL_PIN = " << RELAY_CONTROL_PIN << "\n";
-  Serial << "#  BUTTON_PIN = " << BUTTON_PIN << "\n";
+  Serial << "#  appConfig.relayControlPin = " << appConfig.relayControlPin << "\n";
+  Serial << "#  appConfig.buttonPin = " << appConfig.buttonPin << "\n";
   Serial << "# Other constants:\n";
   Serial << "#  HIGH = " << HIGH << "\n";
   Serial << "#  LOW  = " << LOW << "\n";
@@ -110,17 +122,17 @@ void processLine(const TOGoS::StringView& line) {
 void setup() {
 	delay(1000); // Standard 'give me time to reprogram it' delay
 	Serial.begin(115200);
-	Serial << "# "APP_NAME" setup()\n";
+	Serial << "# " << appConfig.appName << " setup()\n";
 	
 	pinMode(LED_BUILTIN, OUTPUT);
-	pinMode(RELAY_CONTROL_PIN, OUTPUT);
-	pinMode(BUTTON_PIN, INPUT);
+	pinMode(appConfig.relayControlPin, OUTPUT);
+	pinMode(appConfig.buttonPin, INPUT);
 }
 
 int buttonIndicatorPhase = 0;
 
-TOGoS::Arduino::RelayTimer::Relay<RELAY_CONTROL_PIN, RELAY_IS_ACTIVE_LOW> theRelay;
-TOGoS::Arduino::RelayTimer::Button<BUTTON_PIN, BUTTON_IS_ACTIVE_LOW> theButton;
+TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
+TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
 
 const unsigned long indicatorMaxHours = 8;
 const unsigned long indicatorCycleTicks = 512;
