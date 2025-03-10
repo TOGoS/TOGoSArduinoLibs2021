@@ -24,7 +24,6 @@ namespace TOGoS::Arduino::RelayTimer {
 	
 	struct AppConfig {
 		const char *appName;
-		const char *sourceRef;
 		int relayControlPin;
 		bool relayIsActiveLow;
 		int buttonPin;
@@ -149,6 +148,7 @@ namespace TOGoS::Arduino::RelayTimer {
 
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
 #include "config.h"
+#include "version.h"
 
 using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
@@ -168,7 +168,7 @@ TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActive
 
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
-	Serial << "# Source: " << appConfig.sourceRef << "\n";
+	Serial << "# Version: " << appVersion << "\n";
 	Serial << "# Commands:\n";
 	Serial << "#   help     ; print this help\n";
 	Serial << "#   echo ... ; echo stuff back to serial\n";
@@ -191,7 +191,7 @@ void printInfo() {
 	Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
 	Serial << "# App config:\n";
 	Serial << "#  appName           = \"" << appConfig.appName         << "\"\n";
-	Serial << "#  sourceRef         = \"" << appConfig.sourceRef       << "\"\n";
+	Serial << "#  sourceRef         = \"" << appVersion       << "\"\n";
 	Serial << "#  relayControlPin   = " << appConfig.relayControlPin   << "\n";
 	Serial << "#  relayIsActiveLow  = " << appConfig.relayIsActiveLow  << "\n";
 	Serial << "#  buttonPin         = " << appConfig.buttonPin         << "\n";
@@ -242,7 +242,7 @@ void setup() {
 	delay(1000); // Standard 'give me time to reprogram it' delay
 	Serial.begin(115200);
 	Serial << "# " << appConfig.appName << " setup()\n";
-	Serial << "# Source: " << appConfig.sourceRef << "\n";
+	Serial << "# Version: " << appVersion << "\n";
 	
 	pinMode(LED_BUILTIN, OUTPUT);
 	pinMode(appConfig.relayControlPin, OUTPUT);
