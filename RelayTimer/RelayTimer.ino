@@ -21,8 +21,10 @@ namespace TOGoS::Arduino::RelayTimer {
 		ONE_SHOT,
 		LOOPING
 	};
+	
 	struct AppConfig {
 		const char *appName;
+		const char *sourceRef;
 		int relayControlPin;
 		bool relayIsActiveLow;
 		int buttonPin;
@@ -166,30 +168,39 @@ TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActive
 
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
+	Serial << "# Source: " << appConfig.sourceRef << "\n";
 	Serial << "# Commands:\n";
+	Serial << "#   help     ; print this help\n";
 	Serial << "#   echo ... ; echo stuff back to serial\n";
-	Serial << "#   pins     ; dump hardware pin numbers\n";
+	Serial << "#   info     ; show constants and other info\n";
+	Serial << "#   button/long-press  ; do long-press action\n";
+	Serial << "#   button/short-press ; do short-press action\n";
 }
 
-void printConstants() {
-  Serial << "# Pins constants:\n";
-  Serial << "#  D0 = " << D0 << "\n";
-  Serial << "#  D1 = " << D1 << "\n";
-  Serial << "#  D2 = " << D2 << "\n";
-  Serial << "#  D3 = " << D3 << "\n";
-  Serial << "#  D4 = " << D4 << "\n";
-  Serial << "#  D5 = " << D5 << "\n";
-  Serial << "#  D6 = " << D6 << "\n";
-  Serial << "#  D7 = " << D7 << "\n";
-  Serial << "#  D8 = " << D8 << "\n";
-  Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
-  Serial << "#  appConfig.relayControlPin = " << appConfig.relayControlPin << "\n";
-  Serial << "#  appConfig.buttonPin = " << appConfig.buttonPin << "\n";
-  Serial << "# Other constants:\n";
-  Serial << "#  HIGH = " << HIGH << "\n";
-  Serial << "#  LOW  = " << LOW << "\n";
-  Serial << "# Timer:\n";
-  Serial << "#  name = " << theTimer->getName() << "\n";
+void printInfo() {
+	Serial << "# Pins constants:\n";
+	Serial << "#  D0 = " << D0 << "\n";
+	Serial << "#  D1 = " << D1 << "\n";
+	Serial << "#  D2 = " << D2 << "\n";
+	Serial << "#  D3 = " << D3 << "\n";
+	Serial << "#  D4 = " << D4 << "\n";
+	Serial << "#  D5 = " << D5 << "\n";
+	Serial << "#  D6 = " << D6 << "\n";
+	Serial << "#  D7 = " << D7 << "\n";
+	Serial << "#  D8 = " << D8 << "\n";
+	Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
+	Serial << "# App config:\n";
+	Serial << "#  appName           = \"" << appConfig.appName         << "\"\n";
+	Serial << "#  sourceRef         = \"" << appConfig.sourceRef       << "\"\n";
+	Serial << "#  relayControlPin   = " << appConfig.relayControlPin   << "\n";
+	Serial << "#  relayIsActiveLow  = " << appConfig.relayIsActiveLow  << "\n";
+	Serial << "#  buttonPin         = " << appConfig.buttonPin         << "\n";
+	Serial << "#  buttonIsActiveLow = " << appConfig.buttonIsActiveLow << "\n";
+	Serial << "# Other constants:\n";
+	Serial << "#  HIGH = " << HIGH << "\n";
+	Serial << "#  LOW  = " << LOW << "\n";
+	Serial << "# Timer:\n";
+	Serial << "#  name = \"" << theTimer->getName() << "\"\n";
 }
 
 TLIBuffer commandBuffer;
@@ -202,8 +213,7 @@ void processLine(const TOGoS::StringView& line) {
 
 	if( parseResult.isError() ) {
 		Serial << "# Error parsing '" << line << "': " << parseResult.error.getErrorMessage() << "\n";
-	} else {
-		Serial << "# That parsed Okay.\n";
+		return;
 	}
 	
 	const TokenizedCommand &tcmd = parseResult.value;
@@ -217,12 +227,14 @@ void processLine(const TOGoS::StringView& line) {
 		Serial << "\n";
 	} else if( tcmd.path == "help" ) {
 		printHelp();
-	} else if( tcmd.path == "constants" || tcmd.path == "pins" ) {
-		printConstants();
+	} else if( tcmd.path == "info" ) {
+		printInfo();
 	} else if( tcmd.path == "button/short-press" ) {
 		theTimer->input(SBInputEvent::SHORT_PRESS, currentTickTime);
 	} else if( tcmd.path == "button/long-press" ) {
 		theTimer->input(SBInputEvent::LONG_PRESS, currentTickTime);
+	} else {
+		Serial << "# Unrecognized command: '" << tcmd.path << "'\n";
 	}
 }
 
@@ -230,6 +242,7 @@ void setup() {
 	delay(1000); // Standard 'give me time to reprogram it' delay
 	Serial.begin(115200);
 	Serial << "# " << appConfig.appName << " setup()\n";
+	Serial << "# Source: " << appConfig.sourceRef << "\n";
 	
 	pinMode(LED_BUILTIN, OUTPUT);
 	pinMode(appConfig.relayControlPin, OUTPUT);
