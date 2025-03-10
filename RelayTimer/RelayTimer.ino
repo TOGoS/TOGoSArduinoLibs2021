@@ -11,13 +11,23 @@
 using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 
-template <int pin, bool activeLow>
-class Relay {
-public:
-	void set(bool on) {
-		digitalWrite(pin, (on ^ activeLow) ? LOW : HIGH);
-	}
-};
+namespace TOGoS::Arduino::RelayTimer {
+	template <int pin, bool activeLow>
+	class Relay {
+	public:
+		void set(bool on) {
+			digitalWrite(pin, (on ^ activeLow) ? LOW : HIGH);
+		}
+	};
+	
+	template <int pin, bool activeLow>
+	class Button {
+	public:
+		bool isPressed() {
+			return digitalRead(pin) == (activeLow ? LOW : HIGH);
+		}
+	};
+}
 
 void printHelp() {
 	Serial << "# Welcome to " << APP_NAME << "\n";
@@ -26,7 +36,7 @@ void printHelp() {
 	Serial << "#   pins     ; dump hardware pin numbers\n";
 }
 
-void printPins() {
+void printConstants() {
   Serial << "# Pins constants:\n";
   Serial << "#  D0 = " << D0 << "\n";
   Serial << "#  D1 = " << D1 << "\n";
@@ -40,6 +50,9 @@ void printPins() {
   Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
   Serial << "#  RELAY_CONTROL_PIN = " << RELAY_CONTROL_PIN << "\n";
   Serial << "#  BUTTON_PIN = " << BUTTON_PIN << "\n";
+  Serial << "# Other constants:\n";
+  Serial << "#  HIGH = " << HIGH << "\n";
+  Serial << "#  LOW  = " << LOW << "\n";
 }
 
 TLIBuffer commandBuffer;
@@ -73,7 +86,7 @@ void processLine(const TOGoS::StringView& line) {
 	} else {
 		Serial << "# That parsed Okay.\n";
 	}
-
+	
 	const TokenizedCommand &tcmd = parseResult.value;
 	if( tcmd.path == "" ) {
 		return;
@@ -85,8 +98,8 @@ void processLine(const TOGoS::StringView& line) {
 		Serial << "\n";
 	} else if( tcmd.path == "help" ) {
 		printHelp();
-	} else if( tcmd.path == "pins" ) {
-		printPins();
+	} else if( tcmd.path == "constants" || tcmd.path == "pins" ) {
+		printConstants();
 	} else if( tcmd.path == "button/short-press" ) {
 		shortPress();
 	} else if( tcmd.path == "button/long-press" ) {
@@ -106,15 +119,42 @@ void setup() {
 
 int buttonIndicatorPhase = 0;
 
-Relay<RELAY_CONTROL_PIN, true> theRelay;
+TOGoS::Arduino::RelayTimer::Relay<RELAY_CONTROL_PIN, RELAY_IS_ACTIVE_LOW> theRelay;
+TOGoS::Arduino::RelayTimer::Button<BUTTON_PIN, BUTTON_IS_ACTIVE_LOW> theButton;
 
 const unsigned long indicatorMaxHours = 8;
 const unsigned long indicatorCycleTicks = 512;
 const unsigned long indicatorHourTicks = indicatorCycleTicks / indicatorMaxHours;
 
+long buttonDownTime = -1;
+
 void loop() {
 	currentTickTime = millis();
+
+	if( theButton.isPressed() ) {
+		if( buttonDownTime == -1 ) {
+			buttonDownTime = currentTickTime;
+		}
+	} else {
+		if( buttonDownTime != -1 ) {
+			long buttonPressTime = currentTickTime - buttonDownTime;
+			if( buttonPressTime < 100 ) {
+				// Ignore
+			} else {
+				Serial << "# Button was held down for " << buttonPressTime << "ms\n";
+				if( buttonPressTime < 500 ) {
+					shortPress();
+				} else {
+					longPress();
+				}
+			}
+			
+			buttonDownTime = -1;
+		}
+	}
+	
 	bool active = relayResetTime > currentTickTime;
+	// BUILTIN_LED flashes the number of hours left
 	long indicatorOnDutyCycle = active ? (relayResetTime - currentTickTime) * indicatorCycleTicks / (indicatorMaxHours*3600000) : 0;
 	bool indicatorOnMask = (buttonIndicatorPhase & (indicatorHourTicks-1)) < (indicatorHourTicks * 7 / 8);
 	bool indicatorOn = (indicatorOnMask && (buttonIndicatorPhase & (indicatorCycleTicks-1)) < indicatorOnDutyCycle);

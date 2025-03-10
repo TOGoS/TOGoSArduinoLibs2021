@@ -3,3 +3,4 @@
 #define RELAY_CONTROL_PIN D1
 #define RELAY_IS_ACTIVE_LOW true
 #define BUTTON_PIN D7
+#define BUTTON_IS_ACTIVE_LOW true
