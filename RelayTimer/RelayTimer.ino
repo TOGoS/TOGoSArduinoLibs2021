@@ -36,7 +36,7 @@ namespace TOGoS::Arduino::RelayTimer {
 	class Relay {
 	public:
 		void set(bool on) {
-			digitalWrite(pin, (on ^ activeLow) ? LOW : HIGH);
+			digitalWrite(pin, (on ^ activeLow) ? HIGH : LOW);
 		}
 	};
 	
