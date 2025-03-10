@@ -7,6 +7,7 @@ const buildRules : {[name:string]: BuildRule} = {
 	"version.h": {
 		description: "Generate version.h to reference the current Git commit",
 		targetType: "file",
+		prereqs: ["../.git/refs", "../.git/HEAD"],
 		invoke: async (ctx) => {
 			const cmd = new Deno.Command("git", { args: ["rev-parse", "HEAD"]});
 			const { code, stdout, stderr } = await cmd.output();
