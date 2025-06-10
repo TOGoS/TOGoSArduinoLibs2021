@@ -1,0 +1,44 @@
+#+TITLE: HELODemo notes
+
+** 2025-06-10 - IPv6 on ESP8266 research
+
+Looking at the ESP8266WiFi > IPv6 example.
+
+It seems I need to select Tools > 'lwIP variant' = 'v2 IPv6 Lower Memory' or somesuch in order to get it to IPv6 at all.
+
+Then I get output like:
+
+#+begin_example
+------------------------------
+SDK:2.2.2-dev(38a443e)/Core:3.0.2=30002000/lwIP:IPv6+STABLE-2_1_2_RELEASE/glue:1.2-48-g7421258/BearSSL:6105635
+dns0: 192.168.9.1
+dns1: 2600:1702:7ab0:ac10::1
+Try me at these addresses:
+(with 'telnet <addr> or 'nc -u <addr> 23')
+IF='st' IPv6=0 local=0 hostname='ESP-34447B' addr= 192.168.9.161 / mask:255.255.255.0 / gw:192.168.9.1
+IF='st' IPv6=1 local=1 hostname='ESP-34447B' addr= fe80::5ecf:7fff:fe34:447b
+IF='st' IPv6=1 local=0 hostname='ESP-34447B' addr= 2600:1702:7ab0:ac10:5ecf:7fff:fe34:447b
+resolving www.google.com: 172.253.124.106
+resolving ipv6.google.com: 2607:f8b0:4002:c00::71
+resolving www.google.com: 172.253.124.106
+resolving www.yahoo.com: 2001:4998:60:807::1
+------------------------------
+#+end_example
+
+It still connects to the IPv4 network.
+I kind of don't want to do that.
+The whole point was to avoid cluttering my local network's limited space!
+
+But I maybe could use [[https://docs.arduino.cc/libraries/wifi/#%60WiFi.config()%60][WiFi.config(ip, dns, gateway, subnet)]] (dns, gateway, subnet are each optional)
+to manually configure some IPv4 address not on my network.
+
+10.9.7.254, let's say, could be the dummy IPv4 address.
+
+*** Other thoughts
+
+A way to get more frequent updates without spamming the network:
+- Broadcast a few updates right away, then seldomly (once per minute or something)
+- A 'client' can send a packet indicating its interest, maybe every few minutes,
+  and the device will then send packets to that device more often,
+  and maybe in more detail.
+  - Could be a ~#HELO/SUBSCRIBE /topic~ kind of thing!
