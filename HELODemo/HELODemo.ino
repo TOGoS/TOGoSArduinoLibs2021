@@ -43,6 +43,8 @@ void setup() {
 	delay(1000);
 	Serial.println(F("Hello"));
 
+	// The regular Arduino WiFi can just take the IP address,
+	// but the ESP8266WiFi needs at least these three arguments:
 	WiFi.config(ip4, ip4Gateway, ip4Subnet);
 	WiFi.hostname(myHostname); // This needs to come after `config`
 	WiFi.begin(); // And finally, after config and hostname, you may begin.
