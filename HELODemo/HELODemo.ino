@@ -6,6 +6,7 @@ const char *myHostname = "helodemo";
 const byte myIp4[] = {10, 9, 254, 254};
 const byte myIp4Gateway[] = {10, 9, 254, 254};
 const byte myIp4Subnet[] = {255, 255, 255, 255};
+const int myUdpPort = 16378;
 
 void printStatus(Print &out) {
 	out.println(F("--------------"));
@@ -33,6 +34,9 @@ void printStatus(Print &out) {
 	}
 }
 
+
+WiFiUDP udp;
+
 void setup() {
 	IPAddress ip4 = myIp4;
 	IPAddress ip4Gateway = myIp4Gateway;
@@ -48,10 +52,26 @@ void setup() {
 	WiFi.config(ip4, ip4Gateway, ip4Subnet);
 	WiFi.hostname(myHostname); // This needs to come after `config`
 	WiFi.begin(); // And finally, after config and hostname, you may begin.
+	
+	udp.begin(myUdpPort);
 }
 
+long lastBroadcast = -1;
+
 void loop() {
+	long currentTime = millis();
+	
 	printStatus(Serial);
+	
+	if( currentTime - lastBroadcast > 10000 ) {
+		Serial.println("Broadcasting a packet");
+		
+		udp.beginPacket("ff02::1", myUdpPort);
+		udp.write("#HELO\n\nWhat's up lamo");
+		udp.endPacket();
+		
+		lastBroadcast = currentTime;
+	}
 
 	delay(1000);
 }

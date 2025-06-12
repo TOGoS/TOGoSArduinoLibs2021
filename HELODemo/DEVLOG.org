@@ -55,3 +55,13 @@ A way to get more frequent updates without spamming the network:
   and the device will then send packets to that device more often,
   and maybe in more detail.
   - Could be a ~#HELO/SUBSCRIBE /topic~ kind of thing!
+
+** 2025-06-12 - Next steps
+
+*** DONE Decide on a standard HELO UDP port
+
+16378 is not mentioned on https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers, so that.
+
+Published update to https://www.nuke24.net/docs/2025/HELO.html.
+
+*** TODO Broadcast a UDP packet
