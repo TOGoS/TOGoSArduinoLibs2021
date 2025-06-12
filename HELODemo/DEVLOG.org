@@ -65,3 +65,64 @@ A way to get more frequent updates without spamming the network:
 Published update to https://www.nuke24.net/docs/2025/HELO.html.
 
 *** TODO Broadcast a UDP packet
+
+Some findings:
+
+Broadcasting to ~ff02::1~, either from the device or using ~nc~, works,
+and I can receive the packet using ~nc~ or using ~udplisten.ts~ on another Linux machine.
+
+On Windows I can't seem to receive the broadcast packets, even after changing some firewall settings.
+But I can receive the packets sent directly to my link-local IPv6 address
+(this is all using ~udplisten.ts~).
+
+Note: ~nc~ seems to require the device to be specified (e.g. ~ff02::1%enp4s0~) when sending packets,
+but not when listening.
+
+Note: ~nc~ has a ~-b~ option to 'allow broadcast', but I think that's only relevant to IPv4.
+IPv6 has special addresses for broadcasting so doesn't need that bit, and ~nc~ will say
+"Protocol not available" if you tell it to ~-b~ when sending a UDP packet over IPv6.
+
+Note: ~nc~ picks a random port to send from unless you indicate a different source port with ~-p~.
+
+Note: ~nc~ seems to ignore end-of-input-stream, and you have to C-c to kill it.
+Alternatively you can ~-q 1~ to have it quit after one second, but this seems
+to be one second after sending something out...or after EOF is reached?
+~-q 0~ works when I typre stuff in but not when ~echo~ing input to it.
+
+**** Listening with nc
+
+#+begin_src bash
+nc -u -l :: 16378
+#+end_src
+
+#+begin_example
+#HELO
+
+What's up lamo
+#+end_example
+
+Nc seems to only spit out the first packet received.
+
+**** Listening with UDPListen.ts
+
+#+begin_src bash
+deno run --allow-net --unstable-net UDPListen.ts [::]:16378
+#+end_src
+
+#+begin_example
+Received 21 bytes from {"hostname":"fe80::5ecf:7fff:fe34:447b","port":16378,"transport":"udp"}: 2348454c4f0a0a576861742773207570206c616d6f
+#+end_example
+
+**** Sending with nc
+
+Broadcasting:
+
+#+begin_src bash
+echo foo bar baz | nc -6 -u ff02::1%enp4s0 16378
+#+end_src
+
+Directly to my Windows machine:
+
+#+begin_src bash
+nc -6 -u fe80::4a70:73ad:375c:118d%enp4s0 16378
+#+end_src
