@@ -275,17 +275,28 @@ CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedComm
 
 //// MQTT Subsystem
 
-// Or globals for it, at least.
-// For now, the MQTT stuff is scattered through the rest of the program.
-
 using MQTTMaintainer = TOGoS::Command::MQTTMaintainer;
 using MQTTCommandHandler = TOGoS::Command::MQTTCommandHandler;
-
 
 PubSubClient pubSubClient(wifiClient);
 MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(
   &pubSubClient, getDefaultClientId(), getDefaultClientId());
 MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
+
+std::string getDefaultClientId() {
+  byte macAddressBuffer[6];
+  WiFi.macAddress(macAddressBuffer);
+  return macAddressToHex(macAddressBuffer, ":");
+}
+
+void printMqttStatus(Print &out) {
+  out << "mqtt/server/host " << mqttMaintainer.serverName << "\n";
+  out << "mqtt/server/port " << mqttMaintainer.serverPort << "\n";
+  out << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
+}
+
+// More MQTT stuff is scattered through the rest of the program.
+
 
 //// Peripherals
 
@@ -325,20 +336,6 @@ void blinkBuiltin(int count) {
     digitalWrite(LED_BUILTIN, HIGH);
     delay(75);
   }
-}
-
-/// MQTT stuff
-
-std::string getDefaultClientId() {
-  byte macAddressBuffer[6];
-  WiFi.macAddress(macAddressBuffer);
-  return macAddressToHex(macAddressBuffer, ":");
-}
-
-void printMqttStatus(Print &out) {
-  out << "mqtt/server/host " << mqttMaintainer.serverName << "\n";
-  out << "mqtt/server/port " << mqttMaintainer.serverPort << "\n";
-  out << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
 }
 
 /// Constant printers
