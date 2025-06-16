@@ -27,6 +27,7 @@ extern "C" {
 #include <vector>
 
 // Arduino libraries
+#include <AddrList.h>
 #include <ESP8266WiFi.h>
 #include <Print.h>
 #include <PubSubClient.h>
@@ -218,6 +219,24 @@ void printWifiStatus(Print &out) {
   out << "wifi/status-code " << WiFi.status() << "\n";
   out << "wifi/ssid " << WiFi.SSID() << "\n";
   out << "wifi/connected " << (WiFi.status() == WL_CONNECTED ? "true" : "false") << "\n";
+
+  out << "net/ipv6-enabled " << LWIP_IPV6 << "\n";
+  for (auto a : addrList) {
+    out.printf("net/addr IF='%s' IPv6=%d local=%d hostname='%s' addr= %s",
+      a.ifname().c_str(),
+      a.isV6(),
+      a.isLocal(),
+      a.ifhostname(),
+      a.toString().c_str());
+    
+    if (a.isLegacy()) {
+      out.printf(" / mask:%s / gw:%s",
+        a.netmask().toString().c_str(),
+        a.gw().toString().c_str());
+    }
+    
+    out << "\n";
+  }
 }
 
 void printMqttStatus(Print &out) {
