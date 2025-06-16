@@ -299,7 +299,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
     Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
-    Serial << "#   deesleep $seconds ; go into deep sleep\n";
+    Serial << "#   deepsleep $seconds ; go into deep sleep\n";
     Serial << "# \n";
     Serial << "# Use curly braces to quote {multi-word arguments}\n";
     Serial << "# \n";
