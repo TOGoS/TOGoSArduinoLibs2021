@@ -1,4 +1,4 @@
-#+TITLE: HELODemo notes
+#+TITLE: TOGoS Arduino Apps Development Log
 
 ** Library locations
 
@@ -13,7 +13,7 @@ are all in totally different places!
 - Installed Libraries :: ~C:\Users\TOGoS\Documents\Arduino\libraries~
   - e.g. the Nick O'Leary PubSubClient that I like is in ~"C:\Users\TOGoS\Documents\Arduino\libraries\PubSubClient"~
 
-** 2025-06-10 - IPv6 on ESP8266 research
+** 2025-06-10 - HELODemo - IPv6 on ESP8266 research
 
 Looking at the ESP8266WiFi > IPv6 example.
 
@@ -56,7 +56,7 @@ A way to get more frequent updates without spamming the network:
   and maybe in more detail.
   - Could be a ~#HELO/SUBSCRIBE /topic~ kind of thing!
 
-** 2025-06-12 - Next steps
+** 2025-06-12 - HELODemo - Next steps
 
 *** DONE Decide on a standard HELO UDP port
 
