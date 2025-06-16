@@ -4,6 +4,14 @@ const char *APP_VERSION = "0.0.9-dev";
 const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
+// TODO: Make these configurable, optionally null; copied from HELODemo
+const char *myHostname = "es2021";
+bool useStaticIp4 = true;
+const byte myIp4[] = {10, 9, 254, 254};
+const byte myIp4Gateway[] = {10, 9, 254, 254};
+const byte myIp4Subnet[] = {255, 255, 255, 255};
+const int myUdpPort = 16378;
+
 /*
  * Wiring:
  * - D1 = I2C clock
@@ -59,7 +67,16 @@ using StringView = TOGoS::StringView;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 using TCPR = TOGoS::Command::ParseResult<TokenizedCommand>;
 
-//// Pure-ish functions
+//// Additional types
+
+namespace TOGoS { namespace Command {
+  class WiFiCommandHandler {
+  public:
+    CommandResult operator()(const TokenizedCommand &cmd, CommandSource src);
+  };
+}}
+
+//// Additional functions
 
 char hexDigit(int num) {
   num = num & 0xF;
@@ -91,6 +108,10 @@ void printMacAddressHex(uint8_t *macAddress, const char *octetSeparator, class P
     printer.print(hexDigit(macAddress[i] >> 4));
     printer.print(hexDigit(macAddress[i]));
   }
+}
+
+const char *formatBool(int boolish) {
+  return boolish ? "true" : "false";
 }
 
 //// Print overloads
@@ -131,28 +152,142 @@ Print& operator<<(Print& printer, const CommandResult& cresult) {
   return printer;
 }
 
-//// Additional types
+//// System-wide global variables
 
-namespace TOGoS { namespace Command {
-  class WiFiCommandHandler {
-  public:
-    CommandResult operator()(const TokenizedCommand &cmd, CommandSource src);
-  };
-}}
+unsigned long currentTime; // Set at beginning of each update
 
-//// Global variables
+//// WiFi subsystem
+
+// WiFiCommandHandler wifiCommandHandler(); // This confuses the compiler lol.
+// TODO: Make a class in TOGoSArduinoLibs that does this
+struct WiFiCredz {
+  const char *ssid;
+  const char *password;
+  WiFiCredz(const char *ssid, const char *password) : ssid(ssid), password(password) {}
+};
+
+using WiFiCommandHandler = TOGoS::Command::WiFiCommandHandler;
+
+std::vector<WiFiCredz> wifiNetworks;
+int wifiNetworkIndex = -1;
+unsigned long lastWifiReconnectAttempt = 0;
+WiFiCommandHandler wifiCommandHandler;
+WiFiClient wifiClient;
+
+void configureWifi(ESP8266WiFiClass &wifi) {
+  if( useStaticIp4 ) {
+    Serial << "# Configuring with static IPv4 address\n";
+    // Unlike SSID/password, stuff config()ured does *not* seem to be retained.
+    // So we need to wifi.config(...) each time before wifi.begin(...)ing.
+    IPAddress ip4 = myIp4;
+    IPAddress ip4Gateway = myIp4Gateway;
+    IPAddress ip4Subnet = myIp4Subnet;
+    wifi.config(ip4, ip4Gateway, ip4Subnet);
+  }
+  if( myHostname != NULL ) {
+    Serial << "# Configuring hostname\n";
+    wifi.hostname(myHostname); // This needs to come after `config`
+  }
+}
+
+void wifiUpdate() {
+  int status = WiFi.status();
+  if( status == WL_CONNECTED || status == WL_IDLE_STATUS ) return;
+  if( currentTime - lastWifiReconnectAttempt < 5000 ) return;
+    
+  if( wifiNetworks.size() == 0 ) {
+    // Try to auto-connect to whatever's in memory
+    Serial << "# No WiFi networks configured.\n";
+    Serial << "# Attempting auto-connect to previous network...\n";
+    configureWifi(WiFi);
+    WiFi.begin();
+  } else {
+    ++wifiNetworkIndex;
+    if( wifiNetworkIndex >= wifiNetworks.size() ) {
+      wifiNetworkIndex = 0;
+    }
+    
+    const WiFiCredz &credz = wifiNetworks[wifiNetworkIndex];
+    Serial << "# Attempting auto-connect to " << credz.ssid << "...\n";
+    configureWifi(WiFi);
+    WiFi.begin(credz.ssid, credz.password);
+  }
+  
+  lastWifiReconnectAttempt = currentTime;
+}
+
+void printWifiStatus(Print &out) {
+  byte macAddressBuffer[6];
+  WiFi.macAddress(macAddressBuffer);
+
+  out << F("# Number of wifi networks to which I'll attempt to auto-connect;\n");
+  out << F("# (if zero, I may attempt to just begin(); maybe that should be a setting):\n");
+  out << "wifi-config/wifi-network-count " << wifiNetworks.size() << "\n";
+
+  if( myHostname != NULL ) {
+    out << "net-config/hostname " << myHostname << "\n";
+  }
+  out << "net-config/use-static-ip4 " << formatBool(useStaticIp4) << "\n";
+
+  out << "wifi/mac-address " << macAddressToHex(macAddressBuffer, ":") << "\n";
+  out << "wifi/status-code " << WiFi.status() << "\n";
+  out << "wifi/ssid " << WiFi.SSID() << "\n";
+  out << "wifi/connected " << formatBool(WiFi.status() == WL_CONNECTED) << "\n";
+  out << "wifi/auto-connect " << formatBool(WiFi.getAutoConnect()) << "\n";
+  out << "wifi/auto-reconnect " << formatBool(WiFi.getAutoReconnect()) << "\n";
+
+  out << "net/ipv6-enabled " << formatBool(LWIP_IPV6) << "\n";
+  for (auto a : addrList) {
+    out.printf("net/addr IF='%s' IPv6=%d local=%d hostname='%s' addr= %s",
+      a.ifname().c_str(),
+      a.isV6(),
+      a.isLocal(),
+      a.ifhostname(),
+      a.toString().c_str());
+    
+    if (a.isLegacy()) {
+      out.printf(" / mask:%s / gw:%s",
+        a.netmask().toString().c_str(),
+        a.gw().toString().c_str());
+    }
+    
+    out << "\n";
+  }
+}
+
+CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedCommand &cmd, CommandSource src) {
+  if( cmd.path == "wifi/connect" ) {
+    if( cmd.args.size() == 0 ) {
+      configureWifi(WiFi);
+      WiFi.begin();
+      return CommandResult::ok();
+    } else if( cmd.args.size() == 2 ) {
+      configureWifi(WiFi);
+      WiFi.begin(std::string(cmd.args[0]).c_str(), std::string(cmd.args[1]).c_str());
+      return CommandResult::ok();
+    } else {
+      return CommandResult::callerError(std::string(cmd.path)+" requires either 0 or 2 arguments: ssid, secret");
+    }
+  } else {
+    return CommandResult::shrug();
+  }
+}
+
+//// MQTT Subsystem
+
+// Or globals for it, at least.
+// For now, the MQTT stuff is scattered through the rest of the program.
 
 using MQTTMaintainer = TOGoS::Command::MQTTMaintainer;
 using MQTTCommandHandler = TOGoS::Command::MQTTCommandHandler;
-using WiFiCommandHandler = TOGoS::Command::WiFiCommandHandler;
 
-// WiFiCommandHandler wifiCommandHandler(); // This confuses the compiler lol.
-WiFiCommandHandler wifiCommandHandler;
-WiFiClient wifiClient;
+
 PubSubClient pubSubClient(wifiClient);
 MQTTMaintainer mqttMaintainer = MQTTMaintainer::makeStandard(
   &pubSubClient, getDefaultClientId(), getDefaultClientId());
 MQTTCommandHandler mqttCommandHandler(&mqttMaintainer);
+
+//// Peripherals
 
 // Compiler: "'Wire' does not name a type"
 // 
@@ -169,7 +304,6 @@ struct ES2021Reading {
   unsigned long time;
   TOGoS::SHT20::EverythingReading data = TOGoS::SHT20::EverythingReading();
 } latestReading;
-unsigned long currentTime; // Set at beginning of each update
 unsigned long latestMqttPublishTime;
 
 const uint8_t PUB_SERIAL = 0x1;
@@ -193,50 +327,12 @@ void blinkBuiltin(int count) {
   }
 }
 
-CommandResult TOGoS::Command::WiFiCommandHandler::operator()(const TokenizedCommand &cmd, CommandSource src) {
-  if( cmd.path == "wifi/connect" ) {
-    if( cmd.args.size() != 2 ) {
-      return CommandResult::callerError(std::string(cmd.path)+" requires 2 arguments: ssid, secret");
-    }
-    WiFi.begin(std::string(cmd.args[0]).c_str(), std::string(cmd.args[1]).c_str());
-    return CommandResult::ok();
-  } else {
-    return CommandResult::shrug();
-  }
-}
+/// MQTT stuff
 
 std::string getDefaultClientId() {
   byte macAddressBuffer[6];
   WiFi.macAddress(macAddressBuffer);
   return macAddressToHex(macAddressBuffer, ":");
-}
-
-void printWifiStatus(Print &out) {
-  byte macAddressBuffer[6];
-  WiFi.macAddress(macAddressBuffer);
-
-  out << "wifi/mac-address " << macAddressToHex(macAddressBuffer, ":") << "\n";
-  out << "wifi/status-code " << WiFi.status() << "\n";
-  out << "wifi/ssid " << WiFi.SSID() << "\n";
-  out << "wifi/connected " << (WiFi.status() == WL_CONNECTED ? "true" : "false") << "\n";
-
-  out << "net/ipv6-enabled " << LWIP_IPV6 << "\n";
-  for (auto a : addrList) {
-    out.printf("net/addr IF='%s' IPv6=%d local=%d hostname='%s' addr= %s",
-      a.ifname().c_str(),
-      a.isV6(),
-      a.isLocal(),
-      a.ifhostname(),
-      a.toString().c_str());
-    
-    if (a.isLegacy()) {
-      out.printf(" / mask:%s / gw:%s",
-        a.netmask().toString().c_str(),
-        a.gw().toString().c_str());
-    }
-    
-    out << "\n";
-  }
 }
 
 void printMqttStatus(Print &out) {
@@ -245,19 +341,38 @@ void printMqttStatus(Print &out) {
   out << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
 }
 
+/// Constant printers
+
+#define PRINTCONST(CONSTNAME) out << "constants/" << #CONSTNAME << " " << CONSTNAME << "\n"
+
 void printPins(Print &out) {
   out << "# Pins constants:\n";
-  out << "#  D0 = " << D0 << "\n";
-  out << "#  D1 = " << D1 << "\n";
-  out << "#  D2 = " << D2 << "\n";
-  out << "#  D3 = " << D3 << "\n";
-  out << "#  D4 = " << D4 << "\n";
-  out << "#  D5 = " << D5 << "\n";
-  out << "#  D6 = " << D6 << "\n";
-  out << "#  D7 = " << D7 << "\n";
-  out << "#  D8 = " << D8 << "\n";
-  out << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
+  PRINTCONST(D0);
+  PRINTCONST(D1);
+  PRINTCONST(D2);
+  PRINTCONST(D3);
+  PRINTCONST(D4);
+  PRINTCONST(D5);
+  PRINTCONST(D6);
+  PRINTCONST(D7);
+  PRINTCONST(D8);
+  PRINTCONST(LED_BUILTIN);
 }
+
+void printConstants(Print &out) {
+  printPins(out);
+  out << "# WiFi status constants:\n";
+  PRINTCONST(WL_NO_SHIELD);
+  PRINTCONST(WL_IDLE_STATUS);
+  PRINTCONST(WL_NO_SSID_AVAIL);
+  PRINTCONST(WL_SCAN_COMPLETED);
+  PRINTCONST(WL_CONNECTED);
+  PRINTCONST(WL_CONNECT_FAILED);
+  PRINTCONST(WL_CONNECTION_LOST);
+  PRINTCONST(WL_DISCONNECTED);
+}
+
+#define PRINTCONST
 
 struct Henlo {} HENLO;
 
@@ -281,6 +396,9 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
   } else if( tcmd.path == "status" ) {
     printWifiStatus(Serial);
     printMqttStatus(Serial);
+    return CommandResult::ok();
+  } else if( tcmd.path == "constants" ) {
+    printConstants(Serial);
     return CommandResult::ok();
   } else if( tcmd.path == "pins" ) {
     printPins(Serial);
@@ -313,7 +431,7 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     Serial << "#   echo/lines $arg1 .. $argN\n";
     Serial << "#   status ; print status of WiFi, MQTT connection, etc\n";
     Serial << "#   pins ; print pin information\n";
-    Serial << "#   wifi/connect $ssid $password ; connect to a WiFi network\n";
+    Serial << "#   wifi/connect [$ssid $password] ; connect to a WiFi network\n";
     Serial << "#   sht20/read ; Read values from SHT20\n";
     Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
@@ -493,33 +611,6 @@ void redrawReading() {
   printer.clearToEndOfRow();
 }
 
-// TODO: Make a class in TOGoSArduinoLibs that does this
-struct WiFiCredz {
-  const char *ssid;
-  const char *password;
-  WiFiCredz(const char *ssid, const char *password) : ssid(ssid), password(password) {}
-};
-
-std::vector<WiFiCredz> wifiNetworks;
-int wifiNetworkIndex = -1;
-unsigned long lastWifiReconnectAttempt = 0;
-
-void wifiUpdate() {
-  int status = WiFi.status();
-  if( status != WL_CONNECTED && status != WL_IDLE_STATUS &&
-      currentTime - lastWifiReconnectAttempt > 5000 && wifiNetworks.size() > 0 ) {
-    ++wifiNetworkIndex;
-    if( wifiNetworkIndex >= wifiNetworks.size() ) {
-      wifiNetworkIndex = 0;
-    }
-
-    const WiFiCredz &credz = wifiNetworks[wifiNetworkIndex];
-    Serial << "# Attempting auto-connect to " << credz.ssid << "...\n";
-    WiFi.begin(credz.ssid, credz.password);
-    lastWifiReconnectAttempt = currentTime;
-  }
-}
-
 // Use these in your ES2021_POST_SETUP_CPP, if you like:
 
 inline void addWifiNetwork(const char *ssid, const char *password) {
@@ -577,6 +668,7 @@ void loop() {
       commandBuffer.reset();
     }
   }
+  
   delay(10);
   mqttMaintainer.update();
 
