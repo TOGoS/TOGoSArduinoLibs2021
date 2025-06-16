@@ -5,7 +5,7 @@ const int BOOTING_BLINKS = 5;
 const int GOING_TO_SLEEP_BLINKS = 2;
 
 // TODO: Make these configurable, optionally null; copied from HELODemo
-const char *myHostname = "es2021";
+const char *myHostname = NULL; // "es2021";
 bool useStaticIp4 = true;
 const byte myIp4[] = {10, 9, 254, 254};
 const byte myIp4Gateway[] = {10, 9, 254, 254};
@@ -320,6 +320,57 @@ unsigned long latestMqttPublishTime;
 const uint8_t PUB_SERIAL = 0x1;
 const uint8_t PUB_MQTT   = 0x2;
 
+//// HELO
+
+#include <WiFiUdp.h>
+
+class HeloModule {
+  long lastBroadcast = -1;
+
+  WiFiUDP udp;
+public:
+  void update(long currentTime);
+};
+
+void HeloModule::update(long currentTime) {
+  if( currentTime - lastBroadcast > 10000 ) {
+    byte macAddressBuffer[6];
+    WiFi.macAddress(macAddressBuffer);
+    
+    char buf[1024];
+    TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
+    
+    //bufPrn << "#HELO //" << macAddressToHex(macAddressBuffer, "-") << "/\n";
+    bufPrn << "#HELO\n";
+    bufPrn << "\n";
+    bufPrn << "app-name " << APP_NAME << "\n";
+    bufPrn << "app-version " << APP_VERSION << "\n";
+    bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
+    bufPrn << "clock " << currentTime << "\n";
+    
+    const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
+    
+    bufPrn << "sht20/reading/age" << " "<< ((currentTime - latestReading.time) / 1000.0) << "\n";
+    bufPrn << "sht20/connected" << " " << formatBool(reading.isValid()) << "\n";
+    if( reading.isValid() ) {
+      bufPrn << "sht20/temperature/c" << " " << reading.getTemperatureC() << "\n";
+      bufPrn << "sht20/temperature/f" << " " << reading.getTemperatureF() << "\n";
+      bufPrn << "sht20/humidity/percent" << " " << reading.getRhPercent() << "\n";
+    }
+    
+    Serial << "# Broadcasting a HELO packet\n";
+    
+    udp.beginPacket("ff02::1", myUdpPort);
+    udp.write(buf, bufPrn.size());
+    udp.endPacket();
+    
+    lastBroadcast = currentTime;
+  }
+}
+
+
+HeloModule heloModule;
+
 //// Stateful functions
 
 const TOGoS::SHT20::EverythingReading &updateReading() {
@@ -550,7 +601,7 @@ void publishAttr(const char *topic, T value, uint8_t dest) {
 void reportReading(uint8_t dest) {
   const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
   publishAttr("sht20/reading/age", ((currentTime - latestReading.time) / 1000.0), PUB_SERIAL);
-  publishAttr("sht20/connected", reading.isValid(), dest);
+  publishAttr("sht20/connected", formatBool(reading.isValid()), dest);
   if( reading.isValid() ) {
     publishAttr("sht20/temperature/c", reading.getTemperatureC(), dest);
     publishAttr("sht20/temperature/f", reading.getTemperatureF(), dest);
@@ -696,4 +747,5 @@ void loop() {
   }
 
   wifiUpdate();
+  heloModule.update(currentTime);
 }
