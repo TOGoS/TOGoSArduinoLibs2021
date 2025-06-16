@@ -98,7 +98,7 @@ void loop() {
 		//bufPrn << "#HELO //" << macAddressToHex(macAddressBuffer, "-") << "/\n";
 		bufPrn << "#HELO\n";
 		bufPrn << "\n";
-	   bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
+		bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
 		bufPrn << "clock " << currentTime << "\n";
 		bufPrn << "rand " << rand << "\n";
 
