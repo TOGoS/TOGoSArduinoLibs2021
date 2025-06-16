@@ -210,34 +210,34 @@ std::string getDefaultClientId() {
   return macAddressToHex(macAddressBuffer, ":");
 }
 
-void printWifiStatus() {
+void printWifiStatus(Print &out) {
   byte macAddressBuffer[6];
   WiFi.macAddress(macAddressBuffer);
 
-  Serial << "wifi/mac-address " << macAddressToHex(macAddressBuffer, ":") << "\n";
-  Serial << "wifi/status-code " << WiFi.status() << "\n";
-  Serial << "wifi/ssid " << WiFi.SSID() << "\n";
-  Serial << "wifi/connected " << (WiFi.status() == WL_CONNECTED ? "true" : "false") << "\n";
+  out << "wifi/mac-address " << macAddressToHex(macAddressBuffer, ":") << "\n";
+  out << "wifi/status-code " << WiFi.status() << "\n";
+  out << "wifi/ssid " << WiFi.SSID() << "\n";
+  out << "wifi/connected " << (WiFi.status() == WL_CONNECTED ? "true" : "false") << "\n";
 }
 
-void printMqttStatus() {
-  Serial << "mqtt/server/host " << mqttMaintainer.serverName << "\n";
-  Serial << "mqtt/server/port " << mqttMaintainer.serverPort << "\n";
-  Serial << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
+void printMqttStatus(Print &out) {
+  out << "mqtt/server/host " << mqttMaintainer.serverName << "\n";
+  out << "mqtt/server/port " << mqttMaintainer.serverPort << "\n";
+  out << "mqtt/connected " << (mqttMaintainer.isConnected() ? "true" : "false") << "\n";
 }
 
-void printPins() {
-  Serial << "# Pins constants:\n";
-  Serial << "#  D0 = " << D0 << "\n";
-  Serial << "#  D1 = " << D1 << "\n";
-  Serial << "#  D2 = " << D2 << "\n";
-  Serial << "#  D3 = " << D3 << "\n";
-  Serial << "#  D4 = " << D4 << "\n";
-  Serial << "#  D5 = " << D5 << "\n";
-  Serial << "#  D6 = " << D6 << "\n";
-  Serial << "#  D7 = " << D7 << "\n";
-  Serial << "#  D8 = " << D8 << "\n";
-  Serial << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
+void printPins(Print &out) {
+  out << "# Pins constants:\n";
+  out << "#  D0 = " << D0 << "\n";
+  out << "#  D1 = " << D1 << "\n";
+  out << "#  D2 = " << D2 << "\n";
+  out << "#  D3 = " << D3 << "\n";
+  out << "#  D4 = " << D4 << "\n";
+  out << "#  D5 = " << D5 << "\n";
+  out << "#  D6 = " << D6 << "\n";
+  out << "#  D7 = " << D7 << "\n";
+  out << "#  D8 = " << D8 << "\n";
+  out << "#  LED_BUILTIN = " << LED_BUILTIN << "\n";
 }
 
 struct Henlo {} HENLO;
@@ -260,11 +260,11 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     }
     return CommandResult::ok();
   } else if( tcmd.path == "status" ) {
-    printWifiStatus();
-    printMqttStatus();
+    printWifiStatus(Serial);
+    printMqttStatus(Serial);
     return CommandResult::ok();
   } else if( tcmd.path == "pins" ) {
-    printPins();
+    printPins(Serial);
     return CommandResult::ok();
   } else if( tcmd.path == "hi" || tcmd.path == "hello" ) {
     Serial << HENLO << "\n";
