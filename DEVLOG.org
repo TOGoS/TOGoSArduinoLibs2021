@@ -126,3 +126,21 @@ Directly to my Windows machine:
 #+begin_src bash
 nc -6 -u fe80::4a70:73ad:375c:118d%enp4s0 16378
 #+end_src
+
+** 2025-06-16 - Reading an SHT20
+
+Horsed around with EnvironmentalSensor2021 a bunch today,
+refactoring it to my latest whims and adding support
+to send a [[https://www.nuke24.net/docs/2025/HELO.html][#HELO]] packet.
+
+Soldering GX12 connectors is pretty fiddly.
+And the wires on [[https://www.aliexpress.us/item/3256804532475698.html][these SHT20s]] are very thin,
+and that makes it more fiddly.
+
+I don't entirely trust the wires inside the plug.
+How are they not touching the sheath?
+Maybe it's not actually metallic,
+or there's a layer of insulation.
+
+Or maybe I should cover everything with heat-shrink tubing
+and fill it with hot glue to be sure.

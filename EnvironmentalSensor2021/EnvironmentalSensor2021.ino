@@ -14,12 +14,12 @@ const int myUdpPort = 16378;
 
 /*
  * Wiring:
- * - D1 = I2C clock
- * - D2 = I2C data
+ * - D1 = I2C clock (usually yellow wire)
+ * - D2 = I2C data  (usually green or white wire)
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
- * - 3V3 to peripherals' power +
- * - D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep)
+ * - 3V3 to peripherals' power + (usually red wire)
+ * - D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep) (usually black wire)
  */
 
 #include "config.h"
