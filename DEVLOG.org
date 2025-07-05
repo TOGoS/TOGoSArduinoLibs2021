@@ -159,3 +159,10 @@ that both ~updateSht20Reading~ and ~reportReading~ use the passed-in ~&cache~ an
 the global ~sht20ACache~.  What is up with this, hmm...
 
 Maybe I should just get some [[https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout/overview][I2C multiplexerss]] and matching cables.
+
+** 2025-07-05 - MultiSHTDemo
+
+Wrote this while on the bus, so not tested.
+Has several different modes to try and see
+if any of them work.  Maybe re-initializing the I2C
+with different pins will do the job?
