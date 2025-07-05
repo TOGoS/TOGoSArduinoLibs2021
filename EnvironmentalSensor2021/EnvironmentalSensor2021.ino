@@ -16,7 +16,8 @@ const int myUdpPort = 16378;
  * Wiring:
  * - D1 = I2C clock (usually yellow wire)
  * - D2 = I2C data  (usually green or white wire)
- * - D3 = I2C data for a second bus
+ * - D3 = I2C B clock
+ * - D4 = I2C B data
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
  * - 3V3 to peripherals' power + (usually red wire)
@@ -438,7 +439,7 @@ CommandResult readSht20Cmd(TOGoS::SHT20::Driver &sht20, ES2021Reading &cache);
 CommandResult readSht20Cmd(TOGoS::SHT20::Driver &sht20, ES2021Reading &cache) {
   char buf[64];
   TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
-  const TOGoS::SHT20::EverythingReading &reading = updateSht20Reading(sht20A, sht20ACache);
+  const TOGoS::SHT20::EverythingReading &reading = updateSht20Reading(sht20, cache);
   if( reading.isValid() ) {
     bufPrn << "temp:" << reading.getTemperatureC() << "C" << " "
            << "humid:" << reading.getRhPercent() << "%";
@@ -701,7 +702,7 @@ void setup() {
   // either they are both connected (to the same physical sensor)
   // or neither are.
   i2cA.begin(D2,D1);
-  i2cB.begin(D3,D1);
+  i2cB.begin(D4,D3);
   
   Serial << "# Initializing SHT20...\n";
   sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
@@ -746,6 +747,8 @@ void loop() {
 
   if( currentTime - sht20ACache.time > 15000 ) {
     updateSht20Reading(sht20A, sht20ACache);
+  }
+  if( currentTime - sht20BCache.time > 15000 ) {
     updateSht20Reading(sht20B, sht20BCache);
   }
 
