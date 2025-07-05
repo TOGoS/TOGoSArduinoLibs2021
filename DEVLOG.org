@@ -144,3 +144,18 @@ or there's a layer of insulation.
 
 Or maybe I should cover everything with heat-shrink tubing
 and fill it with hot glue to be sure.
+
+** 2025-07-05 - Multiple SHT20s?
+
+Tried sharing D1 = SCL, D2 and D3 = SDA.
+This didn't work.  Seemed like the TwoWire library was somehow only 
+D1 = SCL, D2 = SDA, D3 = SCL B, D4 = SDA B works even less;
+now it can't seem to sense either of them.
+
+But also, something is weird with my code.
+When I ~temhum1/read~, the reported ~temhum1/age~ doesn't reset?
+I looked at the functions several times to make sure
+that both ~updateSht20Reading~ and ~reportReading~ use the passed-in ~&cache~ and not
+the global ~sht20ACache~.  What is up with this, hmm...
+
+Maybe I should just get some [[https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout/overview][I2C multiplexerss]] and matching cables.
