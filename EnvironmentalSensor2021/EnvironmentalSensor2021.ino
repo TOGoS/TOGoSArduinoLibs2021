@@ -16,6 +16,7 @@ const int myUdpPort = 16378;
  * Wiring:
  * - D1 = I2C clock (usually yellow wire)
  * - D2 = I2C data  (usually green or white wire)
+ * - D3 = I2C data for a second bus
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
  * - 3V3 to peripherals' power + (usually red wire)
@@ -307,14 +308,18 @@ void printMqttStatus(Print &out) {
 // Me later: Oh.  TwoWire is the class.  Wire is the instance.
 // This is what happens when you break naming conventions!
 // People get confused!
-TwoWire i2c;
-TOGoS::SHT20::Driver sht20(i2c);
-TOGoS::SSD1306::Driver ssd1306(i2c);
+TwoWire i2cA;
+TwoWire i2cB;
+TOGoS::SHT20::Driver sht20A(i2cA);
+TOGoS::SSD1306::Driver ssd1306(i2cA);
+TOGoS::SHT20::Driver sht20B(i2cB);
 
 struct ES2021Reading {
   unsigned long time;
   TOGoS::SHT20::EverythingReading data = TOGoS::SHT20::EverythingReading();
-} latestReading;
+};
+ES2021Reading sht20ACache;
+ES2021Reading sht20BCache;
 unsigned long latestMqttPublishTime;
 
 const uint8_t PUB_SERIAL = 0x1;
@@ -348,14 +353,14 @@ void HeloModule::update(long currentTime) {
     bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
     bufPrn << "clock " << currentTime << "\n";
     
-    const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
+    const TOGoS::SHT20::EverythingReading &reading = sht20ACache.data;
     
-    bufPrn << "sht20/reading/age" << " "<< ((currentTime - latestReading.time) / 1000.0) << "\n";
-    bufPrn << "sht20/connected" << " " << formatBool(reading.isValid()) << "\n";
+    bufPrn << "temhum0/reading/age" << " "<< ((currentTime - sht20ACache.time) / 1000.0) << "\n";
+    bufPrn << "temhum0/connected" << " " << formatBool(reading.isValid()) << "\n";
     if( reading.isValid() ) {
-      bufPrn << "sht20/temperature/c" << " " << reading.getTemperatureC() << "\n";
-      bufPrn << "sht20/temperature/f" << " " << reading.getTemperatureF() << "\n";
-      bufPrn << "sht20/humidity/percent" << " " << reading.getRhPercent() << "\n";
+      bufPrn << "temhum0/temperature/c" << " " << reading.getTemperatureC() << "\n";
+      bufPrn << "temhum0/temperature/f" << " " << reading.getTemperatureF() << "\n";
+      bufPrn << "temhum0/humidity/percent" << " " << reading.getRhPercent() << "\n";
     }
     
     Serial << "# Broadcasting a HELO packet\n";
@@ -373,10 +378,10 @@ HeloModule heloModule;
 
 //// Stateful functions
 
-const TOGoS::SHT20::EverythingReading &updateReading() {
-  latestReading.data = sht20.readEverything();
-  latestReading.time = currentTime;
-  return latestReading.data;
+const TOGoS::SHT20::EverythingReading &updateSht20Reading(TOGoS::SHT20::Driver &sht20, ES2021Reading &cache) {
+  cache.data = sht20.readEverything();
+  cache.time = currentTime;
+  return cache.data;
 }
 
 void blinkBuiltin(int count) {
@@ -428,7 +433,22 @@ Print &operator<<(Print &p, const struct Henlo &hi) {
   return p << "# Hello from " << APP_NAME << " v" << APP_VERSION << "!";
 }
 
-CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource source) {
+CommandResult readSht20Cmd(TOGoS::SHT20::Driver &sht20, ES2021Reading &cache);
+
+CommandResult readSht20Cmd(TOGoS::SHT20::Driver &sht20, ES2021Reading &cache) {
+  char buf[64];
+  TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
+  const TOGoS::SHT20::EverythingReading &reading = updateSht20Reading(sht20A, sht20ACache);
+  if( reading.isValid() ) {
+    bufPrn << "temp:" << reading.getTemperatureC() << "C" << " "
+           << "humid:" << reading.getRhPercent() << "%";
+    return CommandResult::ok(std::string(bufPrn.str()));
+  } else {
+    return CommandResult::failed("not connected");
+  }
+}
+
+CommandResult processEchoCommand(const TokenizedCommand &tcmd, CommandSource source) {
   if( tcmd.path == "echo" ) {
     for( int i=0; i<tcmd.args.size(); ++i ) {
       if( i > 0 ) Serial << " ";
@@ -460,17 +480,10 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     }
     digitalWrite(atoi(std::string(tcmd.args[0]).c_str()), atoi(std::string(tcmd.args[1]).c_str()));
     return CommandResult::ok();
-  } else if( tcmd.path == "sht20/read" ) {
-    char buf[64];
-    TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
-    const TOGoS::SHT20::EverythingReading &reading = updateReading();
-    if( reading.isValid() ) {
-      bufPrn << "temp:" << reading.getTemperatureC() << "C" << " "
-             << "humid:" << reading.getRhPercent() << "%";
-      return CommandResult::ok(std::string(bufPrn.str()));
-    } else {
-      return CommandResult::failed("not connected");
-    }
+  } else if( tcmd.path == "temhum0/read" ) {
+    return readSht20Cmd(sht20A, sht20ACache);
+  } else if( tcmd.path == "temhum1/read" ) {
+    return readSht20Cmd(sht20B, sht20BCache);
   } else if( tcmd.path == "help" ) {
     Serial << HENLO << "\n";
     Serial << "# \n";
@@ -480,7 +493,8 @@ CommandResult processEchoCommand(const TokenizedCommand& tcmd, CommandSource sou
     Serial << "#   status ; print status of WiFi, MQTT connection, etc\n";
     Serial << "#   pins ; print pin information\n";
     Serial << "#   wifi/connect [$ssid $password] ; connect to a WiFi network\n";
-    Serial << "#   sht20/read ; Read values from SHT20\n";
+    Serial << "#   temhum0/read ; Read values from temperature/humidity device 0\n";
+    Serial << "#   temhum1/read ; Read values from temperature/humidity device 1\n";
     Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
     Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
@@ -567,7 +581,7 @@ void drawConnectionIndicators() {
 void redrawStalenessBar() {
   int screenWidth = ssd1306.getColumnCount();
   ssd1306.gotoRowCol(1,0);
-  long timeSincePreviousReading = millis() - latestReading.time;
+  long timeSincePreviousReading = millis() - sht20ACache.time;
   int stalenessBarWidth = screenWidth * std::min((unsigned int)4000,(unsigned int)timeSincePreviousReading) / 4000;
   for( int i=0; i<stalenessBarWidth; ++i ) {
     ssd1306.sendData(0x42);
@@ -598,14 +612,16 @@ void publishAttr(const char *topic, T value, uint8_t dest) {
   if( dest & PUB_MQTT   ) publishAttrToMqtt(topic, value);
 }
 
-void reportReading(uint8_t dest) {
-  const TOGoS::SHT20::EverythingReading &reading = latestReading.data;
-  publishAttr("sht20/reading/age", ((currentTime - latestReading.time) / 1000.0), PUB_SERIAL);
-  publishAttr("sht20/connected", formatBool(reading.isValid()), dest);
+void reportReading(const std::string &devName, const ES2021Reading &cache, uint8_t dest);
+
+void reportReading(const std::string &devName, const ES2021Reading &cache, uint8_t dest) {
+  const TOGoS::SHT20::EverythingReading &reading = cache.data;
+  publishAttr((devName + "/reading/age").c_str(), ((currentTime - cache.time) / 1000.0), dest);
+  publishAttr((devName + "/connected").c_str(), formatBool(reading.isValid()), dest);
   if( reading.isValid() ) {
-    publishAttr("sht20/temperature/c", reading.getTemperatureC(), dest);
-    publishAttr("sht20/temperature/f", reading.getTemperatureF(), dest);
-    publishAttr("sht20/humidity/percent", reading.getRhPercent(), dest);
+    publishAttr((devName + "/temperature/c").c_str(), reading.getTemperatureC(), dest);
+    publishAttr((devName + "/temperature/f").c_str(), reading.getTemperatureF(), dest);
+    publishAttr((devName + "/humidity/percent").c_str(), reading.getRhPercent(), dest);
   }
 }
 
@@ -619,10 +635,10 @@ void redrawReading() {
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(3,12);
-  if( latestReading.data.temperature.isValid() ) {
-    printer.print(latestReading.data.getTemperatureF(),1);
+  if( sht20ACache.data.temperature.isValid() ) {
+    printer.print(sht20ACache.data.getTemperatureF(),1);
     printer << "F / ";
-    printer.print(latestReading.data.getTemperatureC(),1);
+    printer.print(sht20ACache.data.getTemperatureC(),1);
     printer << "C";
   } else {
     printer << "----";
@@ -634,8 +650,8 @@ void redrawReading() {
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(5,12);
-  if( latestReading.data.humidity.isValid() ) {
-    printer.print(latestReading.data.getRhPercent(),1);
+  if( sht20ACache.data.humidity.isValid() ) {
+    printer.print(sht20ACache.data.getRhPercent(),1);
     printer << "%";
   } else {
     printer << "----";
@@ -644,16 +660,16 @@ void redrawReading() {
   
   ssd1306.gotoRowCol(6,0);
   printer << "VPD: ";
-  if( latestReading.data.isValid() ) {
-    printer.print(latestReading.data.getVpdKpa(),1);
+  if( sht20ACache.data.isValid() ) {
+    printer.print(sht20ACache.data.getVpdKpa(),1);
     printer << " kPa";
   }
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(7,0);
-  if( latestReading.data.isValid() ) {
+  if( sht20ACache.data.isValid() ) {
     printer << "DP : ";
-    printer.print(latestReading.data.getDewPoint().getF(),0);
+    printer.print(sht20ACache.data.getDewPoint().getF(),0);
     printer << " F";
   }
   printer.clearToEndOfRow();
@@ -679,10 +695,17 @@ void setup() {
   Serial << "# " << APP_NAME << " setup()...\n";
   blinkBuiltin(BOOTING_BLINKS); // 5 blinks = booting, same as ArduinoPowerSwitch
   Serial << "# Initializing I2C...\n";
-  i2c.begin();
+
+  // This doesn't seem to work.
+  // It's as if the two instances share some global configuration;
+  // either they are both connected (to the same physical sensor)
+  // or neither are.
+  i2cA.begin(D2,D1);
+  i2cB.begin(D3,D1);
   
   Serial << "# Initializing SHT20...\n";
-  sht20.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
+  sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
+  sht20B.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
 
   Serial << "# Initializing SSD1306 (0x" << hexByte(SSD1306_ADDRESS) << ")...\n";
@@ -695,7 +718,8 @@ void setup() {
   Serial << "# We managed to not crash during boot!\n";
   Serial << "# Type 'help' for help.\n";
 
-  latestReading.time    = millis() - 100000;
+  sht20ACache.time    = millis() - 100000;
+  sht20BCache.time    = millis() - 100000;
   latestMqttPublishTime = millis() - 100000;
 
 #ifdef ES2021_POST_SETUP_CPP
@@ -720,8 +744,9 @@ void loop() {
   delay(10);
   mqttMaintainer.update();
 
-  if( currentTime - latestReading.time > 15000 ) {
-    updateReading();
+  if( currentTime - sht20ACache.time > 15000 ) {
+    updateSht20Reading(sht20A, sht20ACache);
+    updateSht20Reading(sht20B, sht20BCache);
   }
 
   if( currentTime - lastConnectionRedraw > 1000 ) {
@@ -729,7 +754,7 @@ void loop() {
     lastConnectionRedraw = currentTime;
   }
 
-  if( latestReading.time > lastRedraw ) {
+  if( sht20ACache.time > lastRedraw ) {
     redrawReading();
     bool publishToMqtt = currentTime - latestMqttPublishTime > 15000;
     uint8_t pubDest = PUB_SERIAL;
@@ -738,14 +763,15 @@ void loop() {
       Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
       latestMqttPublishTime = currentTime; // Assuming we really are connected lmao
     }
-    reportReading(pubDest); // TODO: Maybe separate from redraw condition
+    reportReading("temhum0", sht20ACache, pubDest); // TODO: Maybe separate from redraw condition
+    reportReading("temhum1", sht20BCache, pubDest); // TODO: Maybe separate from redraw condition
     Serial << "\n";
     redrawStalenessBar();
     lastRedraw = currentTime;
   } else {
     redrawStalenessBar();
   }
-
+  
   wifiUpdate();
   heloModule.update(currentTime);
 }
