@@ -32,7 +32,9 @@
 
 //// Configuration
 
-#define MSD_MODE MSD_MODE_THREE_WIRE_LOCAL
+// Leave MSD_I2CA_INSTANCE undefined to create a new TwoWire instance, 'i2cA'
+#define MSD_I2CA_INSTANCE Wire
+#define MSD_MODE MSD_MODE_THREE_WIRE_REINIT
 const char *APP_NAME = "MultiSHTDemo";
 
 ////
@@ -101,13 +103,19 @@ const char *APP_NAME = "MultiSHTDemo";
 #define MSD_LOCAL_DRIVERS 1
 #endif
 
+#define PRINTCONST(out,CONSTNAME) out << "# " << #CONSTNAME << " = " << (CONSTNAME) << "\n"
+#define NAMEOF(NAME) #NAME
+#define NAMEOFEXPANDED(NAME) NAMEOF(NAME)
 
 #if MSD_GLOBAL_DRIVERS == 1
+#ifndef MSD_I2CA_INSTANCE
 TwoWire i2cA;
+#define MSD_I2CA_INSTANCE 
+#endif
 #if MSD_SEPARATE_INSTANCES == 1
 TwoWire i2cB;
 #endif
-TOGoS::SHT20::Driver sht20A(i2cA);
+TOGoS::SHT20::Driver sht20A(MSD_I2CA_INSTANCE);
 #if MSD_SEPARATE_INSTANCES == 1
 TOGoS::SHT20::Driver sht20B(i2cB);
 #endif
@@ -149,10 +157,10 @@ void setup() {
   Serial << "# Initializing I2C...\n";
 
 #if MSD_GLOBAL_DRIVERS == 1
-  i2cA.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
+  MSD_I2CA_INSTANCE.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
   delay(100); // Just in case
 #if MSD_SEPARATE_INSTANCES == 1
-  i2cA.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
+  MSD_I2CA_INSTANCE.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
   delay(100); // Just in case
 #endif
 
@@ -170,16 +178,17 @@ void setup() {
 
 void loop() {
   Serial << "# Loop\n";
-  Serial << "# MSD_MODE = " << MSD_MODE << "\n";
-  Serial << "# MSD_REINIT = " << MSD_REINIT << "\n";
-  Serial << "# MSD_SEPARATE_INSTANCES = " << MSD_SEPARATE_INSTANCES << "\n";
+  PRINTCONST(Serial, MSD_MODE);
+  Serial << "# i2cA = " << NAMEOFEXPANDED(MSD_I2CA_INSTANCE) << "\n";
+  PRINTCONST(Serial, MSD_REINIT);
+  PRINTCONST(Serial, MSD_SEPARATE_INSTANCES);
 
 #if MSD_LOCAL_DRIVERS == 1
   initReadAndReport("sht20-a", MSD_I2CA_SDA, MSD_I2CA_SCL, Serial);
   initReadAndReport("sht20-b", MSD_I2CB_SDA, MSD_I2CB_SCL, Serial);
 #else
 #if MSD_REINIT == 1
-  i2cA.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
+  MSD_I2CA_INSTANCE.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
   sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
 #endif
@@ -188,7 +197,7 @@ void loop() {
 #if MSD_SEPARATE_INSTANCES == 1
   readAndReport("sht20-b", sht20B, Serial);
 #elif MSD_REINIT == 1
-  i2cA.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
+  MSD_I2CA_INSTANCE.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
   sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
   readAndReport("sht20-b", sht20A, Serial);
