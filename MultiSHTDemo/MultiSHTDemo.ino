@@ -4,11 +4,6 @@
 // 
 // Minimal sketch for trying to read from more than one I2C SHT20,
 // because apparently this is tricky.
-// 
-// TODO: Try sharing a pin
-// 
-// TODO: Try having just *one* TwoWire instance, and re-initialize it
-// with different pins to read different sensor
 
 #include <TOGoSStreamOperators.h>
 #include <TOGoSSHT20.h>
