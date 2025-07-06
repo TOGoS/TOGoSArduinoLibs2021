@@ -2,8 +2,15 @@
 //
 // MultiSHTDemo
 // 
-// Minimal sketch for trying to read from more than one I2C SHT20,
+// Not-so-minimal (due to several different modes of operation)
+// sketch for trying to read from more than one I2C SHT20,
 // because apparently this is tricky.
+// 
+// Wiring:
+// SCL-A = D1
+// SDA-A = D2
+// SCL-B = D3, unless in THREE_WIRE mode, in which case it's D1 again
+// SDA-B = D4 (in both three and four-wire mode, so you don't have to move it)
 
 #include <TOGoSStreamOperators.h>
 #include <TOGoSSHT20.h>
