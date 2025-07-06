@@ -25,9 +25,12 @@
 // Only a single device
 #define MSD_MODE_TWO_WIRE 0
 
+// Another possible approach would be to keep the I2C and SHT20 driver
+// instances in local variables, use them and forget them
+
 //// Configuration
 
-#define MSD_MODE MSD_MODE_FOUR_WIRE_REINIT
+#define MSD_MODE MSD_MODE_TWO_WIRE
 const char *APP_NAME = "MultiSHTDemo";
 
 ////
@@ -100,15 +103,16 @@ void readAndReport(const char *name, TOGoS::SHT20::Driver &sht20, Print &out) {
 void setup() {
   delay(500); // Standard 'give me time to reprogram it' delay in case the program messes up some I/O pins
   Serial.begin(115200);
-  
+  pinMode(D5, OUTPUT); // Provides I2C GND
+
   Serial << "\n\n"; // Get past any junk in the terminal
   Serial << "# " << APP_NAME << " setup()...\n";
   Serial << "# Initializing I2C...\n";
   
-  i2cA.begin(D2,D1);
+  i2cA.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
   delay(100); // Just in case
 #if MSD_SEPARATE_INSTANCES == 1
-  i2cB.begin(D4,D3);
+  i2cA.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
   delay(100); // Just in case
 #endif
 
@@ -124,19 +128,26 @@ void setup() {
 }
 
 void loop() {
+  Serial << "# Loop\n";
+  Serial << "# MSD_MODE = " << MSD_MODE << "\n";
+  Serial << "# MSD_REINIT = " << MSD_REINIT << "\n";
+  Serial << "# MSD_SEPARATE_INSTANCES = " << MSD_SEPARATE_INSTANCES << "\n";
+
 #if MSD_REINIT == 1
   i2cA.begin(MSD_I2CA_SDA,MSD_I2CA_SCL);
+  sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
 #endif
   readAndReport("sht20-a", sht20A, Serial);
   
 #if MSD_SEPARATE_INSTANCES == 1
   readAndReport("sht20-b", sht20B, Serial);
-#elseif MSD_REINIT == 1
+#elif MSD_REINIT == 1
   i2cA.begin(MSD_I2CB_SDA,MSD_I2CB_SCL);
+  sht20A.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   delay(100);
   readAndReport("sht20-b", sht20A, Serial);
 #endif
 
-  delay(500);
+  delay(1500);
 }
