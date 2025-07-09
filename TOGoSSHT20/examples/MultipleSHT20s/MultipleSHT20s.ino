@@ -42,13 +42,14 @@ void printProp(const char *devName, const char *propName, const T &value, Print 
 
 void readAndReport(const char *devName, TOGoS::SHT20::Driver &sht20, Print &out) {
   TOGoS::SHT20::EverythingReading data = sht20.readEverything();
+  // Words abbreviated so they fit on your screen better
   if( data.isValid() ) {
-    printProp(devName, "connected:"       ,                100    , out);
-    printProp(devName, "temperature/f:"   , data.getTemperatureF(), out);
-    printProp(devName, "temperature/c:"   , data.getTemperatureC(), out);
-    printProp(devName, "humidity/percent:", data.getRhPercent()   , out);
+    printProp(devName, "conn" ,                100    , out);
+    printProp(devName, "t/f"  , data.getTemperatureF(), out);
+    printProp(devName, "t/c"  , data.getTemperatureC(), out);
+    printProp(devName, "h/pct", data.getRhPercent()   , out);
   } else {
-    printProp(devName, "connected"       ,                  0    , out);
+    printProp(devName, "conna",                  0    , out);
   }
 }
 
