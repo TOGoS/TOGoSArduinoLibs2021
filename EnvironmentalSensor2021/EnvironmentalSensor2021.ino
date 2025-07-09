@@ -583,25 +583,25 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
 #endif
   } else if( tcmd.path == "help" ) {
     Serial << HENLO << "\n";
-    Serial << "# \n";
-    Serial << "# Commands:\n";
-    Serial << "#   echo $arg1 .. $argN\n";
-    Serial << "#   echo/lines $arg1 .. $argN\n";
-    Serial << "#   status ; print status of WiFi, MQTT connection, etc\n";
-    Serial << "#   pins ; print pin information\n";
-    Serial << "#   wifi/connect [$ssid $password] ; connect to a WiFi network\n";
-    Serial << "#   temhum0/read ; Read values from temperature/humidity device 0\n";
-    Serial << "#   temhum1/read ; Read values from temperature/humidity device 1\n";
-    Serial << "#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n";
-    Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
-    Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
-    Serial << "#   deepsleep $seconds ; go into deep sleep\n";
-    Serial << "#   verbosity/set $v ; Set serial verbosity level; 50=normal, 100=debug\n";
-    Serial << "# \n";
-    Serial << "# Use curly braces to quote {multi-word arguments}\n";
-    Serial << "# \n";
-    Serial << "# WiFi and MQTT connections will automatically reconnect\n";
-    Serial << "# unless server name is empty string (represented by '{}')\n";
+    Serial << F("# \n");
+    Serial << F("# Commands:\n");
+    Serial << F("#   echo $arg1 .. $argN\n");
+    Serial << F("#   echo/lines $arg1 .. $argN\n");
+    Serial << F("#   status ; print status of WiFi, MQTT connection, etc\n");
+    Serial << F("#   pins ; print pin information\n");
+    Serial << F("#   wifi/connect [$ssid $password] ; connect to a WiFi network\n");
+    Serial << F("#   temhum0/read ; Read values from temperature/humidity device 0\n");
+    Serial << F("#   temhum1/read ; Read values from temperature/humidity device 1\n");
+    Serial << F("#   mqtt/connect $server $port $username $password ; connect to an MQTT server\n");
+    Serial << F("#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n");
+    Serial << F("#   mqtt/publish $topic $value ; publish to MQTT\n");
+    Serial << F("#   deepsleep $seconds ; go into deep sleep\n");
+    Serial << F("#   verbosity/set $v ; Set serial verbosity level; 50=normal, 100=debug\n");
+    Serial << F("# \n");
+    Serial << F("# Use curly braces to quote {multi-word arguments}\n");
+    Serial << F("# \n");
+    Serial << F("# WiFi and MQTT connections will automatically reconnect\n");
+    Serial << F("# unless server name is empty string (represented by '{}')\n");
     return CommandResult::ok();
   } else if( tcmd.path == "deepsleep" ) {
     if( tcmd.args.size() != 1 ) {
