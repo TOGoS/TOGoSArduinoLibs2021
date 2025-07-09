@@ -902,17 +902,17 @@ void loop() {
 #ifdef ES2021_I2C1_SDA
   maybeUpdateSht20Reading(temhum1Cache, currentTime, ES2021_I2C1_SDA, ES2021_I2C1_SCL);
   lastReadingUpdate = max(temhum1Cache.time, lastReadingUpdate);
-  reportReading("temhum1", temhum0Cache, pubDest);
+  reportReading("temhum1", temhum1Cache, pubDest);
 #endif
 #ifdef ES2021_I2C2_SDA
   maybeUpdateSht20Reading(temhum2Cache, currentTime, ES2021_I2C2_SDA, ES2021_I2C2_SCL);
   lastReadingUpdate = max(temhum2Cache.time, lastReadingUpdate);
-  reportReading("temhum2", temhum0Cache, pubDest);
+  reportReading("temhum2", temhum2Cache, pubDest);
 #endif
 #ifdef ES2021_I2C3_SDA
   maybeUpdateSht20Reading(temhum3Cache, currentTime, ES2021_I2C3_SDA, ES2021_I2C3_SCL);
   lastReadingUpdate = max(temhum3Cache.time, lastReadingUpdate);
-  reportReading("temhum3", temhum0Cache, pubDest);
+  reportReading("temhum3", temhum3Cache, pubDest);
 #endif
   
   setWireBus(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
