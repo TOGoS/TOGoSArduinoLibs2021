@@ -362,6 +362,13 @@ const uint8_t PUB_SERIAL = 0x1;
 const uint8_t PUB_MQTT   = 0x2;
 // HELO packets handled separately
 
+//// Global serial stuff
+
+uint8_t serialVerbosity = 20;
+const uint8_t VERB_NORMAL =  50;
+const uint8_t VERB_INFO   =  60; // Show readings periodically
+const uint8_t VERB_DEBUG  = 100;
+
 //// HELO
 
 #include <WiFiUdp.h>
@@ -416,8 +423,10 @@ void HeloModule::update(long currentTime) {
 #ifdef ES2021_I2C3_SDA
     printTemhumData("temhum3", temhum3Cache, bufPrn);
 #endif
-    
-    Serial << "# Broadcasting a HELO packet\n";
+
+    if( serialVerbosity >= VERB_INFO ) {
+      Serial << "# Broadcasting a HELO packet\n";
+    }
     
     udp.beginPacket("ff02::1", myUdpPort);
     udp.write(buf, bufPrn.size());
@@ -439,7 +448,9 @@ void setWireBus(int sda, int scl) {
   // Not sure if there's any reason to skip it,
   // but if we do want to...
   if( currentSda != sda || currentScl != scl ) {
-    Serial << "# Switching to bus SDA=" << sda << ", SCL=" << scl << "\n";
+    if( serialVerbosity >= VERB_DEBUG ) {
+      Serial << "# Switching to bus SDA=" << sda << ", SCL=" << scl << "\n";
+    }
     Wire.begin(sda, scl);
     currentSda = sda;
     currentScl = scl;
@@ -534,6 +545,7 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
     }
     return CommandResult::ok();
   } else if( tcmd.path == "status" ) {
+    Serial << "verbosity " << serialVerbosity << "\n";
     printWifiStatus(Serial);
     printMqttStatus(Serial);
     return CommandResult::ok();
@@ -583,6 +595,7 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
     Serial << "#   mqtt/disconnect ; disconnect/stop trying to connect to any MQTT server\n";
     Serial << "#   mqtt/publish $topic $value ; publish to MQTT\n";
     Serial << "#   deepsleep $seconds ; go into deep sleep\n";
+    Serial << "#   verbosity/set $v ; Set serial verbosity level; 50=normal, 100=debug\n";
     Serial << "# \n";
     Serial << "# Use curly braces to quote {multi-word arguments}\n";
     Serial << "# \n";
@@ -599,6 +612,22 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
       ESP.deepSleep(sleeptime * 1000000);
       return CommandResult::ok(); // Probably never get here lol
     }
+  } else if( tcmd.path == "verbosity/set" ) {
+    if( tcmd.args.size() != 1 ) {
+      return CommandResult::callerError("Usage: verbosity/set <level : 0..100>");
+    }
+    Serial << "# Finna parse your verbosity level, '" << tcmd.args[0] << "'\n";
+    int level = atoi(std::string(tcmd.args[0]).c_str());
+    if( level < 0 || level > 100 ) {
+      Serial << "# Out of range!\n";
+      char buf[64];
+      TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
+      bufPrn << "Verbosity out of range (0..100): " << level;
+      return CommandResult::callerError(bufPrn.c_str());
+    }
+    Serial << "# It's an okay level!  Carrying on\n";
+    serialVerbosity = level;
+    return CommandResult::ok();
   } else if( tcmd.path == "bye" ) {
     Serial << "# See ya later!\n";
     return CommandResult::ok();
@@ -847,7 +876,7 @@ void loop() {
 
   Timestamp lastReadingUpdate = 0;
   bool publishToMqtt   = currentTime - latestMqttPublishTime > 15000;
-  bool publishToSerial = currentTime - lastReadingToSerial   >  5000;
+  bool publishToSerial = (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial   >  5000);
   uint8_t pubDest = 0;
   if( publishToSerial ) {
     pubDest |= PUB_SERIAL;
@@ -857,7 +886,9 @@ void loop() {
   // Need to decouple reading/publishing more.
   if( publishToMqtt && mqttMaintainer.isConnected() ) {
     pubDest |= PUB_MQTT;
-    Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
+    if( serialVerbosity >= VERB_INFO ) {
+      Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
+    }
     latestMqttPublishTime = currentTime; // Assuming we really are connected lmao
   }
 
