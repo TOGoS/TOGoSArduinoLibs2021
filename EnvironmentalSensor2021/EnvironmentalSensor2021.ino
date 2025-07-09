@@ -379,8 +379,7 @@ void printTemhumData(const char *devName, const ES2021Reading &cache, Print &out
 
 void printTemhumData(const char *devName, const ES2021Reading &cache, Print &out) {
   const TOGoS::SHT20::EverythingReading &reading = cache.data;
-  out << devName << "/read" << " " << (cache.time / 1000.0) << "\n";
-  //out << devName << "/reading/age" << " "<< ((currentTime - cache.time) / 1000.0) << "\n";
+  out << devName << "/last-read" << " " << cache.time << "\n";
   out << devName << "/connected" << " " << formatBool(reading.isValid()) << "\n";
   if( reading.isValid() ) {
     out << devName << "/temperature/c" << " " << reading.getTemperatureC() << "\n";
@@ -440,6 +439,7 @@ void setWireBus(int sda, int scl) {
   // Not sure if there's any reason to skip it,
   // but if we do want to...
   if( currentSda != sda || currentScl != scl ) {
+    Serial << "# Switching to bus SDA=" << sda << ", SCL=" << scl << "\n";
     Wire.begin(sda, scl);
     currentSda = sda;
     currentScl = scl;
@@ -448,9 +448,9 @@ void setWireBus(int sda, int scl) {
 }
 
 const TOGoS::SHT20::EverythingReading &updateSht20Reading(ES2021Reading &cache, long currentTime, int sda, int scl) {
-  TOGoS::SHT20::Driver sht20(Wire);
   setWireBus(sda, scl);
-  delay(i2cBusSwitchDelay);
+  TOGoS::SHT20::Driver sht20(Wire);
+  sht20.begin(TOGoS::SHT20::Driver::DEFAULT_ADDRESS);
   cache.data = sht20.readEverything();
   cache.time = currentTime;
   return cache.data;
@@ -698,11 +698,15 @@ void publishAttr(const char *topic, T value, uint8_t dest) {
   if( dest & PUB_MQTT   ) publishAttrToMqtt(topic, value);
 }
 
+// Hmm: This whole system where dest is a bitmask
+// seems a little...at an odd angle to being able to fully
+// control what's published to where, when.
+
 void reportReading(const std::string &devName, const ES2021Reading &cache, uint8_t dest);
 
 void reportReading(const std::string &devName, const ES2021Reading &cache, uint8_t dest) {
   const TOGoS::SHT20::EverythingReading &reading = cache.data;
-  publishAttr((devName + "/reading/age").c_str(), ((currentTime - cache.time) / 1000.0), dest);
+  publishAttr((devName + "/last-read").c_str(), currentTime, dest);
   publishAttr((devName + "/connected").c_str(), formatBool(reading.isValid()), dest);
   if( reading.isValid() ) {
     publishAttr((devName + "/temperature/c").c_str(), reading.getTemperatureC(), dest);
@@ -764,6 +768,7 @@ void redrawReading(const ES2021Reading &cache) {
 
 Timestamp lastReadingRedraw = 0;
 Timestamp lastConnectionRedraw = 0;
+Timestamp lastReadingToSerial = 0;
 
 void maybeUpdateSht20Reading(ES2021Reading &cache, long currentTime, int sda, int scl);
 
@@ -818,6 +823,7 @@ void setup() {
   temhum3Cache.time    = millis() - 100000;
 #endif
 
+  lastReadingToSerial   = millis() - 100000;
   latestMqttPublishTime = millis() - 100000;
 
 #ifdef ES2021_POST_SETUP_CPP
@@ -840,9 +846,13 @@ void loop() {
   mqttMaintainer.update();
 
   Timestamp lastReadingUpdate = 0;
-  bool publishToMqtt = currentTime - latestMqttPublishTime > 15000;
-  uint8_t pubDest = PUB_SERIAL;
-  
+  bool publishToMqtt   = currentTime - latestMqttPublishTime > 15000;
+  bool publishToSerial = currentTime - lastReadingToSerial   >  5000;
+  uint8_t pubDest = 0;
+  if( publishToSerial ) {
+    pubDest |= PUB_SERIAL;
+    lastReadingToSerial = currentTime;
+  }
   // Hmm: this logic is a little weird now that there are multiple sensors.
   // Need to decouple reading/publishing more.
   if( publishToMqtt && mqttMaintainer.isConnected() ) {
@@ -850,6 +860,8 @@ void loop() {
     Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
     latestMqttPublishTime = currentTime; // Assuming we really are connected lmao
   }
+
+  publishAttr("time", currentTime, pubDest);
   
 #ifdef ES2021_I2C0_SDA
   maybeUpdateSht20Reading(temhum0Cache, currentTime, ES2021_I2C0_SDA, ES2021_I2C0_SCL);
@@ -886,8 +898,10 @@ void loop() {
 #endif
     lastReadingRedraw = currentTime;
   }
-  
-  Serial << "\n";
+
+  if( publishToSerial ) {
+    Serial << "\n";
+  }
   
   redrawStalenessBar();
   
