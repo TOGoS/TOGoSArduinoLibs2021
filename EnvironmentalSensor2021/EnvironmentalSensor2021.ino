@@ -424,11 +424,12 @@ void HeloModule::update(long currentTime) {
     printTemhumData("temhum3", temhum3Cache, bufPrn);
 #endif
 
+    const char *broadcastAddr = "ff02::1";
     if( serialVerbosity >= VERB_INFO ) {
-      Serial << "# Broadcasting a HELO packet\n";
+      Serial << "# Broadcasting a HELO packet to [" << broadcastAddr << "]:" << myUdpPort << "\n";
     }
     
-    udp.beginPacket("ff02::1", myUdpPort);
+    udp.beginPacket(broadcastAddr, myUdpPort);
     udp.write(buf, bufPrn.size());
     udp.endPacket();
     
