@@ -433,9 +433,23 @@ HeloModule heloModule;
 
 //// Stateful functions
 
+int currentSda = -1;
+int currentScl = -1;
+
+void setWireBus(int sda, int scl) {
+  // Not sure if there's any reason to skip it,
+  // but if we do want to...
+  if( currentSda != sda || currentScl != scl ) {
+    Wire.begin(sda, scl);
+    currentSda = sda;
+    currentScl = scl;
+    delay(i2cBusSwitchDelay);
+  }
+}
+
 const TOGoS::SHT20::EverythingReading &updateSht20Reading(ES2021Reading &cache, long currentTime, int sda, int scl) {
   TOGoS::SHT20::Driver sht20(Wire);
-  Wire.begin(sda, scl);
+  setWireBus(sda, scl);
   delay(i2cBusSwitchDelay);
   cache.data = sht20.readEverything();
   cache.time = currentTime;
@@ -779,7 +793,7 @@ void setup() {
   blinkBuiltin(BOOTING_BLINKS); // 5 blinks = booting, same as ArduinoPowerSwitch
   Serial << "# Initializing I2C...\n";
   
-  Wire.begin(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
+  setWireBus(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
   
   Serial << "# Initializing SSD1306 (0x" << hexByte(SSD1306_ADDRESS) << ")...\n";
   ssd1306.begin(SSD1306_ADDRESS);
@@ -858,8 +872,7 @@ void loop() {
   reportReading("temhum3", temhum0Cache, pubDest);
 #endif
   
-  Wire.begin(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
-  delay(i2cBusSwitchDelay);
+  setWireBus(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
   
   if( currentTime - lastConnectionRedraw > 1000 ) {
     drawConnectionIndicators();
