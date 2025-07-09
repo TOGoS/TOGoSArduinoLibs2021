@@ -617,16 +617,13 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
     if( tcmd.args.size() != 1 ) {
       return CommandResult::callerError("Usage: verbosity/set <level : 0..100>");
     }
-    Serial << "# Finna parse your verbosity level, '" << tcmd.args[0] << "'\n";
     int level = atoi(std::string(tcmd.args[0]).c_str());
     if( level < 0 || level > 100 ) {
-      Serial << "# Out of range!\n";
       char buf[64];
       TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
       bufPrn << "Verbosity out of range (0..100): " << level;
       return CommandResult::callerError(bufPrn.c_str());
     }
-    Serial << "# It's an okay level!  Carrying on\n";
     serialVerbosity = level;
     return CommandResult::ok();
   } else if( tcmd.path == "bye" ) {
