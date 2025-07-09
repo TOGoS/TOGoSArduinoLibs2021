@@ -876,7 +876,7 @@ void loop() {
 
   Timestamp lastReadingUpdate = 0;
   bool publishToMqtt   = currentTime - latestMqttPublishTime > 15000;
-  bool publishToSerial = (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial   >  5000);
+  bool publishToSerial = serialVerbosity >= VERB_DEBUG || (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial   >  5000);
   uint8_t pubDest = 0;
   if( publishToSerial ) {
     pubDest |= PUB_SERIAL;
