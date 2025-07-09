@@ -16,11 +16,11 @@
 #define MSD_I2C0_SDA D2
 // Set to D1 to hare SCL between the two sensors, D3 to give it its own SCL
 #define MSD_I2C1_SCL D1
-#define MSD_I2C1_SDA D4
+#define MSD_I2C1_SDA D3
 #define MSD_I2C2_SCL D1
-#define MSD_I2C2_SDA D6
+#define MSD_I2C2_SDA D4
 #define MSD_I2C3_SCL D1
-#define MSD_I2C3_SDA D8
+#define MSD_I2C3_SDA D7
 
 // Delay between i2c and sht20 begin() calls, to "give electrons time to settle"?
 #define MSD_STEP_DELAY 50
