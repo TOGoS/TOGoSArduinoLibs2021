@@ -196,3 +196,12 @@ Re-initialize a single I2C instance, or put it in a local variable.
 The local variable approach might be less suitable if you also
 have *other* devices on your bus that have stateful driver objects
 associated with the ~TwoWire~ instance.
+
+** 2025-07-08 - Try four SHT20s!
+
+It seems to help if I don't hook D6 to a sensor,
+so I have SCL = D1, SDA = D2, D3, D4, and D7.
+
+Aaand it seems to work, so on to building a nicer enclosure
+and updating EnvironmentalSensor2021 to handle multiple
+SHT20s in the way demonstrated by [[https://raw.githubusercontent.com/TOGoS/TOGoSArduinoLibs2021/refs/heads/master/TOGoSSHT20/examples/MultipleSHT20s/MultipleSHT20s.ino][MultipleSHT20s.ino]].
