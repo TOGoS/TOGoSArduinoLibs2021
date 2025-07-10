@@ -13,6 +13,31 @@ are all in totally different places!
 - Installed Libraries :: ~C:\Users\TOGoS\Documents\Arduino\libraries~
   - e.g. the Nick O'Leary PubSubClient that I like is in ~"C:\Users\TOGoS\Documents\Arduino\libraries\PubSubClient"~
 
+** Pins
+
+*** Detailed ESP8266 Pin Guide
+
+(copied from [[x-git-object:682a03fc048dce3563cd47c68e055c5fae5a32cf#2018/ESP8266/ESP8266.org][ProjectNotes2/2018/ESP8266/ESP8266.org]])
+
+[[https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/][This guide]] might be good.
+Note that you can mess up boot by connecting D3, D5, or TX to low or D8 to high
+
+| Label | GPIO   | Input        | Output        | Notes                                                         |
+|-------+--------+--------------+---------------+---------------------------------------------------------------|
+| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                    |
+| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C)                                       |
+| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                       |
+| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW           |
+| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW            |
+| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                    |
+| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                    |
+| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                    |
+| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                           |
+| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                  |
+| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW |
+| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                    |
+
+
 ** 2025-06-10 - HELODemo - IPv6 on ESP8266 research
 
 Looking at the ESP8266WiFi > IPv6 example.
@@ -125,6 +150,12 @@ Directly to my Windows machine:
 
 #+begin_src bash
 nc -6 -u fe80::4a70:73ad:375c:118d%enp4s0 16378
+#+end_src
+
+**** Using nc to forward broadcast packets
+
+#+begin_src bash
+nc -6lu ff02::1%wlp3s0 16378 | nc -6u fe80::4a70:73ad:375c:118d%wlp3s0 16378
 #+end_src
 
 ** 2025-06-16 - Reading an SHT20
