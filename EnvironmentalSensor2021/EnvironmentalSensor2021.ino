@@ -5,6 +5,7 @@
  * - D3 = I2C 1 data (usually green or white wire)
  * - D4 = I2C 2 data (usually green or white wire)
  * - D7 = I2C 3 data (usually green or white wire)
+ * - D8 = 'touch button' with pull-down (so button should short to 3V3)
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
  * - 3V3 to peripherals' power + (usually red wire)
@@ -37,6 +38,9 @@ const int myUdpPort = 16378;
 #define ES2021_I2C2_SDA D4
 #define ES2021_I2C3_SCL D1
 #define ES2021_I2C3_SDA D7
+
+#define ES2021_TOUCH_BUTTON_PIN D8
+#define ES2021_TOUCH_BUTTON_ACTIVE_LOW 0
 
 // Delay between twiddling between I2C busses, in case that's needed?
 const int i2cBusSwitchDelay = 0;
@@ -179,6 +183,9 @@ Print& operator<<(Print& printer, const CommandResult& cresult) {
 typedef unsigned long Timestamp;
 
 Timestamp currentTime; // Set at beginning of each update
+
+boolean touchButtonPressed = 0;
+Timestamp touchButtonLastPressed = 0;
 
 //// WiFi subsystem
 
@@ -410,6 +417,8 @@ void HeloModule::update(long currentTime) {
     bufPrn << "app-version " << APP_VERSION << "\n";
     bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
     bufPrn << "clock " << currentTime << "\n";
+    bufPrn << "touch-button/pressed " << touchButtonPressed << "\n";
+    bufPrn << "touch-button/last-pressed " << touchButtonLastPressed << "\n";
     
 #ifdef ES2021_I2C0_SDA
     printTemhumData("temhum0", temhum0Cache, bufPrn);
@@ -820,6 +829,9 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(D5, OUTPUT);
   pinMode(D7, OUTPUT);
+#ifdef ES2021_TOUCH_BUTTON_PIN
+  pinMode(ES2021_TOUCH_BUTTON_PIN, INPUT);
+#endif
   Serial << "\n\n"; // Get past any junk in the terminal
   Serial << "# " << APP_NAME << " setup()...\n";
   blinkBuiltin(BOOTING_BLINKS); // 5 blinks = booting, same as ArduinoPowerSwitch
@@ -858,9 +870,37 @@ void setup() {
 #endif
 }
 
+void checkTouchButton(Timestamp currentTime);
+
+void checkTouchButton(Timestamp currentTime) {
+#ifdef ES2021_TOUCH_BUTTON_PIN
+  int pressed = digitalRead(ES2021_TOUCH_BUTTON_PIN) ^ ES2021_TOUCH_BUTTON_ACTIVE_LOW;
+  if( serialVerbosity >= VERB_NORMAL ) {
+    if( pressed && !touchButtonPressed ) {
+      Serial << "# Button down\n";
+    } else if( touchButtonPressed && !pressed ) {
+      Serial << "# Button up\n";
+    }
+  }
+  touchButtonPressed = pressed;
+  if( touchButtonPressed ) {
+    touchButtonLastPressed = currentTime;
+  }
+#endif
+}
+
 void loop() {
-  currentTime = millis();
+  const boolean loopDebug = false;
   
+  if( loopDebug ) Serial << "# Loop: begin\n";
+  currentTime = millis();
+
+  // I wonder if I can set an interrupt
+  // or check during delays or something.
+  if( loopDebug ) Serial << "# Loop: checkTouchButton()...\n";
+  checkTouchButton(currentTime);
+  
+  if( loopDebug ) Serial << "# Loop: Check searial input...\n";
   while( Serial.available() > 0 ) {
     TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
     if( bufState == TLIBuffer::BufferState::READY ) {
@@ -869,11 +909,16 @@ void loop() {
     }
   }
   
+  if( loopDebug ) Serial << "# Loop: delay(10)...\n";
+
   delay(10);
+
+  if( loopDebug ) Serial << "# Loop: mqttMaintainer.update()...\n";
+
   mqttMaintainer.update();
 
   Timestamp lastReadingUpdate = 0;
-  bool publishToMqtt   = currentTime - latestMqttPublishTime > 15000;
+  bool publishToMqtt   = (currentTime - latestMqttPublishTime > 15000) && mqttMaintainer.isConnected();
   bool publishToSerial = serialVerbosity >= VERB_DEBUG || (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial   >  5000);
   uint8_t pubDest = 0;
   if( publishToSerial ) {
@@ -882,7 +927,7 @@ void loop() {
   }
   // Hmm: this logic is a little weird now that there are multiple sensors.
   // Need to decouple reading/publishing more.
-  if( publishToMqtt && mqttMaintainer.isConnected() ) {
+  if( publishToMqtt ) {
     pubDest |= PUB_MQTT;
     if( serialVerbosity >= VERB_INFO ) {
       Serial << "# Publishing to " << getDefaultClientId() << "/...\n";
@@ -890,7 +935,12 @@ void loop() {
     latestMqttPublishTime = currentTime; // Assuming we really are connected lmao
   }
 
-  publishAttr("time", currentTime, pubDest);
+  if( loopDebug ) Serial << "# Loop: MQTT connected? " << mqttMaintainer.isConnected() << "; publish to MQTT? " << publishToMqtt << "\n";
+  if( loopDebug ) Serial << "# Loop: Publish data...\n";
+  
+  publishAttr("clock", currentTime, pubDest);
+  publishAttr("touch-button/pressed", touchButtonPressed, pubDest);
+  publishAttr("touch-button/last-pressed", touchButtonLastPressed, pubDest);
   
 #ifdef ES2021_I2C0_SDA
   maybeUpdateSht20Reading(temhum0Cache, currentTime, ES2021_I2C0_SDA, ES2021_I2C0_SCL);
@@ -932,8 +982,12 @@ void loop() {
     Serial << "\n";
   }
   
+  if( loopDebug ) Serial << "# Loop: redrawStalenessBar()...\n";
   redrawStalenessBar();
   
+  if( loopDebug ) Serial << "# Loop: Wifi update...\n";
   wifiUpdate();
+  if( loopDebug ) Serial << "# Loop: Helo module update...\n";
   heloModule.update(currentTime);
+  if( loopDebug ) Serial << "# Loop: End\n";
 }

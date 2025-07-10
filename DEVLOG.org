@@ -236,3 +236,11 @@ so I have SCL = D1, SDA = D2, D3, D4, and D7.
 Aaand it seems to work, so on to building a nicer enclosure
 and updating EnvironmentalSensor2021 to handle multiple
 SHT20s in the way demonstrated by [[https://raw.githubusercontent.com/TOGoS/TOGoSArduinoLibs2021/refs/heads/master/TOGoSSHT20/examples/MultipleSHT20s/MultipleSHT20s.ino][MultipleSHT20s.ino]].
+
+** 2025-07-10 - Adding a button
+
+For some reason there seems to be a long delay while trying to read
+sensor data...which may have been because one of the sensors had SCL
+and SDA plugged in but not power.
+
+After solving that, the new button logic seems to work okay.
