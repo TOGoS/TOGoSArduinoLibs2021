@@ -30,5 +30,11 @@ const listener = Deno.listenDatagram({
 });
 while( true ) {
 	const [data, sourceAddr] = await listener.receive();
-	console.log(`Received ${data.length} bytes from ${JSON.stringify(sourceAddr)}: ${uint8ArrayToHex(data)}`);
+	let text;
+	try {
+		text = "text:\n  " + new TextDecoder().decode(data).replaceAll("\n","\n  ");
+	} catch( e ) {
+		text = "hex: " + uint8ArrayToHex(data);
+	}
+	console.log(`Received ${data.length} bytes from ${JSON.stringify(sourceAddr)}: ${text}`);
 }
