@@ -208,7 +208,7 @@ WiFiClient wifiClient;
 
 void configureWifi(ESP8266WiFiClass &wifi) {
   if( useStaticIp4 ) {
-    Serial << "# Configuring with static IPv4 address\n";
+    Serial << F("# Configuring with static IPv4 address\n");
     // Unlike SSID/password, stuff config()ured does *not* seem to be retained.
     // So we need to wifi.config(...) each time before wifi.begin(...)ing.
     IPAddress ip4 = myIp4;
@@ -217,23 +217,25 @@ void configureWifi(ESP8266WiFiClass &wifi) {
     wifi.config(ip4, ip4Gateway, ip4Subnet);
   }
   if( myHostname != NULL ) {
-    Serial << "# Configuring hostname\n";
+    Serial << F("# Configuring hostname = '") << myHostname << F("'\n");
     wifi.hostname(myHostname); // This needs to come after `config`
   }
+  Serial << F("# configureWifi: done\n");
 }
 
 void wifiUpdate() {
   int status = WiFi.status();
   if( status == WL_CONNECTED || status == WL_IDLE_STATUS ) return;
   if( currentTime - lastWifiReconnectAttempt < 5000 ) return;
-    
+  
+  Serial << F("# wifiUpdate: not connected; time to attempt [re]connect\n");
   if( wifiNetworks.size() == 0 ) {
     // Try to auto-connect to whatever's in memory
-    Serial << "# No WiFi networks configured.\n";
-    Serial << "# Attempting auto-connect to previous network...\n";
+    Serial << F("# No WiFi networks configured; attempting auto-connect to previous network...\n");
     configureWifi(WiFi);
     WiFi.begin();
   } else {
+    Serial << F("# wifiUpdate: ") << wifiNetworks.size() << F(" networks configured\n");
     ++wifiNetworkIndex;
     if( wifiNetworkIndex >= wifiNetworks.size() ) {
       wifiNetworkIndex = 0;
@@ -246,6 +248,7 @@ void wifiUpdate() {
   }
   
   lastWifiReconnectAttempt = currentTime;
+  Serial << "# wifiUpdate: done\n";
 }
 
 void printWifiStatus(Print &out) {
@@ -869,6 +872,8 @@ void setup() {
 #ifdef ES2021_POST_SETUP_CPP
   ES2021_POST_SETUP_CPP
 #endif
+
+  Serial << "# setup: done\n";
 }
 
 void checkTouchButton(Timestamp currentTime);
