@@ -244,3 +244,42 @@ sensor data...which may have been because one of the sensors had SCL
 and SDA plugged in but not power.
 
 After solving that, the new button logic seems to work okay.
+
+** 2025-07-11 - Prototype wired up!
+
+#+CAPTION: prototype wiring
+[[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:XQPYICR6KE46CHB2B4Y3MBUEECLLBQRL.KB6NERA3NS4GM3I7PZR77FEBCV65CUBNTJJL4QI/20250711_125635.jpg]]
+
+Supports:
+- Four sensors
+- One little OLED display
+- One button (not hooked up in photo)
+
+Currently only the first sensor, ~temhum0~, will be reported on the screen.
+
+*** Wiring
+
+I am using a small breadboard with two blocks of 17 columns x 5 rows,
+with the WeMos D1 at one end, so that the antenna sticks off the end as much as possible.
+All the 'shared' pins (3V3, GND, SCL, SDA0, in that order so that the display can plug right into those four columns)
+are broken out from under the WeMos to the other end of the breadboard.
+This leaves one row on each side of the board where the sensors can plug in
+by their respective pins.
+
+- D1 = I2C shared clock (usually yellow wire)
+- D2 = I2C 0 data (usually green or white wire)
+- D3 = I2C 1 data (usually green or white wire)
+- D4 = LED_BUILTIN
+- D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep) (usually black wire)
+- D6 = I2C 2 data (usually green or white wire)
+- D7 = I2C 3 data (usually green or white wire)
+- D8 = 'touch button' with pull-down (so button should short to 3V3)
+- 3V3 to peripherals' power + (usually red wire)
+
+TODO:
+- [X] Document wiring
+- [X] Include pic
+- [ ] Cut a version, maybe call this v0.0.12.
+- [ ] Make alternate screen mode to show T/H from all four sensors at once
+- [ ] Prototype a panel for the display (maybe with the button under it?)
+- [ ] Print one giant panel so this can all be wired up easily
