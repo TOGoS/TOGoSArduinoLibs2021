@@ -3,13 +3,14 @@
  * - D1 = I2C shared clock (usually yellow wire)
  * - D2 = I2C 0 data (usually green or white wire)
  * - D3 = I2C 1 data (usually green or white wire)
- * - D4 = I2C 2 data (usually green or white wire)
+ * - D4 = LED_BUILTIN
+ * - D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep) (usually black wire)
+ * - D6 = I2C 2 data (usually green or white wire)
  * - D7 = I2C 3 data (usually green or white wire)
  * - D8 = 'touch button' with pull-down (so button should short to 3V3)
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
  * - 3V3 to peripherals' power + (usually red wire)
- * - D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep) (usually black wire)
  */
 
 //// Begin configuration section
@@ -35,7 +36,7 @@ const int myUdpPort = 16378;
 #define ES2021_I2C1_SCL D1
 #define ES2021_I2C1_SDA D3
 #define ES2021_I2C2_SCL D1
-#define ES2021_I2C2_SDA D4
+#define ES2021_I2C2_SDA D6
 #define ES2021_I2C3_SCL D1
 #define ES2021_I2C3_SDA D7
 
