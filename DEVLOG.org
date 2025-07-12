@@ -276,9 +276,24 @@ by their respective pins.
 - D8 = 'touch button' with pull-down (so button should short to 3V3)
 - 3V3 to peripherals' power + (usually red wire)
 
-TODO:
+** 2025-07-12 - wiring documented
+
+ES2021 'full wiring' (all peripherals) documented in [[./EnvironmentalSensor2021/Wiring.dxf][EnvironmentalSensor2021/Wiring.dxf]],
+and snapshotted as [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf][EnvironmentalSensor2021Wiring-v0.1.pdf]].
+
+I seem to have broken one of my OLED screens by cramming it into a hole that it didn't quite fit into
+(WSITEM-201768's hole before I filed it out).  I found one more.  So I'm about out of these
+and I suppose I should order more if I want to have them around.
+
+*** TODO
+
 - [X] Document wiring
 - [X] Include pic
+- [X] Buy more little SSD1306 OLED displays
+  - WSORDER-300221
+- [ ] I think this case isn't going to be quite deep enough.  Print a deeper one!  9" long!
+  ...or pring a couple of 'spacer rails' or something.
+  Maybe that's how these things could be assembled.
 - [ ] Cut a version, maybe call this v0.0.12.
 - [ ] Make alternate screen mode to show T/H from all four sensors at once
 - [ ] Prototype a panel for the display (maybe with the button under it?)

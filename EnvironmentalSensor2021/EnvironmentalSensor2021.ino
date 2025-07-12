@@ -587,6 +587,8 @@ CommandResult processEs2021Command(const TokenizedCommand &tcmd, CommandSource s
     Serial << "verbosity " << serialVerbosity << "\n";
     printWifiStatus(Serial);
     printMqttStatus(Serial);
+    Serial << "screen0/row-count " << ssd1306.getRowCount() << "\n";
+    Serial << "screen0/column-count " << ssd1306.getColumnCount() << "\n";
     return CommandResult::ok();
   } else if( tcmd.path == "constants" ) {
     printConstants(Serial);
