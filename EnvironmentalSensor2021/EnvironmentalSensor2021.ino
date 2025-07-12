@@ -1,7 +1,7 @@
 /*
  * Tested with TOGoSArduinoLibs2021 commit 0788e42ef28ed0d169efb8b367b79a54d0f22549
  * 
- * Default wiring:
+ * Default wiring (can be overridden in config.h):
  * - D1 = I2C shared clock (usually yellow wire)
  * - D2 = I2C 0 data (usually green or white wire)
  * - D3 = I2C 1 data (usually green or white wire)
@@ -13,12 +13,11 @@
  * - RST to d0 to enable waking from deep sleep,
  *   but this seems to need to be disconnected during flashing.
  * - 3V3 to peripherals' power + (usually red wire)
+ *
+ * See Wiring.dxf, or http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf
  */
 
 //// Begin configuration section
-
-// TODO: Either don't bother with config.h,
-// or move this stuff into it
 
 const char *APP_NAME = "EnvironmentalSensor2021";
 const char *APP_SHORT_NAME = "ES2021";
