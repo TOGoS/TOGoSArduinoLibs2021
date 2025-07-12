@@ -1,4 +1,6 @@
 /*
+ * Tested with TOGoSArduinoLibs2021 commit 0788e42ef28ed0d169efb8b367b79a54d0f22549
+ * 
  * Default wiring:
  * - D1 = I2C shared clock (usually yellow wire)
  * - D2 = I2C 0 data (usually green or white wire)
@@ -380,13 +382,13 @@ const uint8_t VERB_NORMAL =  50;
 const uint8_t VERB_INFO   =  60; // Show readings periodically
 const uint8_t VERB_DEBUG  = 100;
 
-//// HELO
+//// HELO (see https://www.nuke24.net/docs/2025/HELO.html)
 
 #include <WiFiUdp.h>
 
 class HeloModule {
   long lastBroadcast = -1;
-
+  
   WiFiUDP udp;
 public:
   void update(long currentTime);

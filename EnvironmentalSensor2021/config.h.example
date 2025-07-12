@@ -1,3 +1,12 @@
+// You can add WiFi networks to automatically connect.
+// If none are defined, the program will try to reconnect
+// to the most recently connected network, which can
+// be configured with `wifi/connect {ssid here} {password here}`
+// (include the curly braces -- that's how you quote tokens in this command language).
+// 
+// MQTT server is *not* automatically remembered.
+// But maybe you just want to use HELO packets anyway.
+
 // Code to run during setup()
 #define ES2021_POST_SETUP_CPP \
   addWifiNetwork("YOUR_SSID_HERE","YOUR_WIFI_PASSWORD_HERE"); \
