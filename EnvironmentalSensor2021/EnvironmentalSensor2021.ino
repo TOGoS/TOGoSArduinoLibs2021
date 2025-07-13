@@ -46,7 +46,7 @@ const int myUdpPort = 16378;
 
 // Delay between twiddling between I2C busses, in case that's needed?
 const int i2cBusSwitchDelay = 0;
-const long shtPollInterval = 500;
+const long shtPollInterval = 1000;
 
 #include "config.h"
 
@@ -786,21 +786,57 @@ void reportReading(const std::string &devName, const ES2021Reading &cache, uint8
   }
 }
 
-void redrawReading(const ES2021Reading &cache);
-void redrawReading(const ES2021Reading &cache) {
-  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+//// Drawing
 
-  // TODO: Put something on screen to show WiFi/MQTT connectivity
+void printNN(float num, TOGoS::SSD1306::Printer &printer) {
+  if( num >= 0 && num < 10 ) {
+    printer << " ";
+  }
+  printer.print(num, 0);
+}
+void printNNDotN(float num, TOGoS::SSD1306::Printer &printer) {
+  if( num >= 0 && num < 10 ) {
+    printer << " ";
+  }
+  printer.print(num, 1);
+}
 
+void drawReadingLine(const TOGoS::SHT20::EverythingReading &data, int row, TOGoS::SSD1306::Printer &printer) {
+  // TODO: Have printer proxy gotoRowCol to the SSD1306 so we don't have to reference it directly
+  ssd1306.gotoRowCol(row,0);
+  if( data.temperature.isValid() ) {
+    printNN(data.getTemperatureF(), printer);
+    printer << "F ";
+    printNNDotN(data.getTemperatureC(), printer);
+    printer << "C ";
+  } else {
+    printer << "--- ----- ";
+  }
+  if( data.humidity.isValid() ) {
+    printNNDotN(data.getRhPercent(), printer);
+    printer << "%";
+  } else {
+    printer << "-----";
+  }
+  printer.clearToEndOfRow();
+}
+
+void drawReadingLineIfNew(const ES2021Reading &cache, Timestamp currentTime, int row, TOGoS::SSD1306::Printer &printer);
+void drawReadingLineIfNew(const ES2021Reading &cache, Timestamp currentTime, int row, TOGoS::SSD1306::Printer &printer) {
+  if( cache.time == currentTime ) drawReadingLine(cache.data, row, printer);
+}
+
+void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306::Printer &printer);
+void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306::Printer &printer) {
   ssd1306.gotoRowCol(2,0);
   printer << "Temperature:";
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(3,12);
-  if( cache.data.temperature.isValid() ) {
-    printer.print(cache.data.getTemperatureF(),1);
+  if( data.temperature.isValid() ) {
+    printer.print(data.getTemperatureF(),1);
     printer << "F / ";
-    printer.print(cache.data.getTemperatureC(),1);
+    printer.print(data.getTemperatureC(),1);
     printer << "C";
   } else {
     printer << "----";
@@ -812,8 +848,8 @@ void redrawReading(const ES2021Reading &cache) {
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(5,12);
-  if( cache.data.humidity.isValid() ) {
-    printer.print(cache.data.getRhPercent(),1);
+  if( data.humidity.isValid() ) {
+    printer.print(data.getRhPercent(),1);
     printer << "%";
   } else {
     printer << "----";
@@ -822,29 +858,28 @@ void redrawReading(const ES2021Reading &cache) {
   
   ssd1306.gotoRowCol(6,0);
   printer << "VPD: ";
-  if( cache.data.isValid() ) {
-    printer.print(cache.data.getVpdKpa(),1);
+  if( data.isValid() ) {
+    printer.print(data.getVpdKpa(),1);
     printer << " kPa";
   }
   printer.clearToEndOfRow();
   
   ssd1306.gotoRowCol(7,0);
-  if( cache.data.isValid() ) {
+  if( data.isValid() ) {
     printer << "DP : ";
-    printer.print(cache.data.getDewPoint().getF(),0);
+    printer.print(data.getDewPoint().getF(),0);
     printer << " F";
   }
   printer.clearToEndOfRow();
 }
 
-Timestamp lastReadingRedraw = 0;
 Timestamp lastConnectionRedraw = 0;
 Timestamp lastReadingToSerial = 0;
 
 boolean maybeUpdate(Timestamp &lastUpdate, Timestamp currentTime, long interval);
 
 boolean maybeUpdate(Timestamp &lastUpdate, Timestamp currentTime, long interval) {
-  if( currentTime - lastUpdate > interval ) {
+  if( currentTime - lastUpdate >= interval ) {
     lastUpdate = currentTime;
     return true;
   } else {
@@ -930,8 +965,8 @@ void checkTouchButton(Timestamp currentTime);
 void checkTouchButton(Timestamp currentTime) {
 #ifdef ES2021_TOUCH_BUTTON_PIN
   int isDown = digitalRead(ES2021_TOUCH_BUTTON_PIN) ^ ES2021_TOUCH_BUTTON_ACTIVE_LOW;
-  if( serialVerbosity >= VERB_NORMAL ) {
-    if( isDown != touchButtonIsDown ) {
+  if( isDown != touchButtonIsDown ) {
+    if( serialVerbosity >= VERB_NORMAL ) {
       if( isDown ) Serial << "# Button down\n";
       else Serial << "# Button up\n";
     }
@@ -1004,28 +1039,24 @@ void loop() {
 #ifdef ES2021_I2C0_SDA
   if( !didSensorRead ) {
     didSensorRead = maybeUpdateSht20Reading(temhum0Cache, currentTime, ES2021_I2C0_SDA, ES2021_I2C0_SCL);
-    lastReadingUpdate = max(temhum0Cache.time, lastReadingUpdate);
     reportReading("temhum0", temhum0Cache, pubDest);
   }
 #endif
 #ifdef ES2021_I2C1_SDA
   if( !didSensorRead ) {
     didSensorRead = maybeUpdateSht20Reading(temhum1Cache, currentTime, ES2021_I2C1_SDA, ES2021_I2C1_SCL);
-    lastReadingUpdate = max(temhum1Cache.time, lastReadingUpdate);
     reportReading("temhum1", temhum1Cache, pubDest);
   }
 #endif
 #ifdef ES2021_I2C2_SDA
   if( !didSensorRead ) {
     didSensorRead = maybeUpdateSht20Reading(temhum2Cache, currentTime, ES2021_I2C2_SDA, ES2021_I2C2_SCL);
-    lastReadingUpdate = max(temhum2Cache.time, lastReadingUpdate);
     reportReading("temhum2", temhum2Cache, pubDest);
   }
 #endif
 #ifdef ES2021_I2C3_SDA
   if( !didSensorRead ) {
     didSensorRead = maybeUpdateSht20Reading(temhum3Cache, currentTime, ES2021_I2C3_SDA, ES2021_I2C3_SCL);
-    lastReadingUpdate = max(temhum3Cache.time, lastReadingUpdate);
     reportReading("temhum3", temhum3Cache, pubDest);
   }
 #endif
@@ -1040,13 +1071,21 @@ void loop() {
       lastConnectionRedraw = currentTime;
     }
     
-    if( lastReadingUpdate > lastReadingRedraw ) {
-      // TODO: Draw them all?
 #ifdef ES2021_I2C0_SDA
-      redrawReading(temhum0Cache);
+    // drawReadingFull(temhum0Cache.data, printer);
 #endif
-      lastReadingRedraw = currentTime;
-    }
+#ifdef ES2021_I2C0_SDA
+    drawReadingLineIfNew(temhum0Cache, currentTime, 2, printer);
+#endif      
+#ifdef ES2021_I2C1_SDA
+    drawReadingLineIfNew(temhum1Cache, currentTime, 3, printer);
+#endif      
+#ifdef ES2021_I2C2_SDA
+    drawReadingLineIfNew(temhum2Cache, currentTime, 4, printer);
+#endif      
+#ifdef ES2021_I2C3_SDA
+    drawReadingLineIfNew(temhum3Cache, currentTime, 5, printer);
+#endif      
     
     if( titleBarNeedsRedraw ) {
       drawTitleBar(touchButtonIsDown, printer);

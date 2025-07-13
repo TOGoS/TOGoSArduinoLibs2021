@@ -306,12 +306,12 @@ That easily fits in a packet, so no need to compress.
 - [X] Include pic
 - [X] Buy more little SSD1306 OLED displays
   - WSORDER-300221
+- [X] Prototype a panel for the display (maybe with the button under it?)
 - [X] I think this case isn't going to be quite deep enough.  Print a deeper one!  9" long!
   ...or pring a couple of 'spacer rails' or something.
   Maybe that's how these things could be assembled.
   - 1" rails should do the job (see WSITEM-3424 p53, 'way 3')
 - [X] Indicate on screen when button pressed
+- [X] Make alternate screen mode to show T/H from all four sensors at once
 - [ ] Cut a version, maybe call this v0.0.12.
-- [ ] Make alternate screen mode to show T/H from all four sensors at once
-- [ ] Prototype a panel for the display (maybe with the button under it?)
 - [ ] Print one giant panel so this can all be wired up easily
