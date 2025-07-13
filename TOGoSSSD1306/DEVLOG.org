@@ -49,3 +49,7 @@ that doesn't do anything with the SSD1306, body text is still scrolling.
 Did I tell it to automatically scroll?  Must have.  Humph.
 
 I suppose I should document those commands in SomeText.ino's ~loop~.
+
+** [2025-07-13]
+
+Added ~gotoRowCol~ to Printer so you don't need to reference the driver directly.
