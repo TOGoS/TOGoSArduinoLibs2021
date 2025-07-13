@@ -285,7 +285,22 @@ I seem to have broken one of my OLED screens by cramming it into a hole that it 
 (WSITEM-201768's hole before I filed it out).  I found one more.  So I'm about out of these
 and I suppose I should order more if I want to have them around.
 
-*** TODO
+** 2025-07-13 - Wiring it all up!
+
+*** Q: How big the packets?
+
+| Sensor |    size |
+|  count | (bytes) |
+|--------+---------|
+|      0 |     345 |
+|      1 |     431 |
+|      2 |     517 |
+|      3 |     603 |
+|      4 |     689 |
+
+That easily fits in a packet, so no need to compress.
+
+** TODO
 
 - [X] Document wiring
 - [X] Include pic
