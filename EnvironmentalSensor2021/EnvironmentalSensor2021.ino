@@ -46,7 +46,7 @@ const int myUdpPort = 16378;
 
 // Delay between twiddling between I2C busses, in case that's needed?
 const int i2cBusSwitchDelay = 0;
-const long shtPollInterval = 5000;
+const long shtPollInterval = 500;
 
 #include "config.h"
 
@@ -186,7 +186,8 @@ typedef unsigned long Timestamp;
 
 Timestamp currentTime; // Set at beginning of each update
 
-boolean touchButtonPressed = 0;
+boolean touchButtonIsDown = false;
+boolean titleBarNeedsRedraw = false;
 Timestamp touchButtonLastPressed = 0;
 
 //// WiFi subsystem
@@ -376,10 +377,11 @@ const uint8_t PUB_MQTT   = 0x2;
 
 //// Global serial stuff
 
-uint8_t serialVerbosity = 20;
-const uint8_t VERB_NORMAL =  50;
-const uint8_t VERB_INFO   =  60; // Show readings periodically
-const uint8_t VERB_DEBUG  = 100;
+uint8_t serialVerbosity      =  20;
+const uint8_t VERB_NORMAL    =  50;
+const uint8_t VERB_INFO      =  60; // Show readings periodically
+const uint8_t VERB_MORE_INFO =  80; // Show readings all the time
+const uint8_t VERB_DEBUG     = 100;
 
 //// HELO (see https://www.nuke24.net/docs/2025/HELO.html)
 
@@ -422,7 +424,7 @@ void HeloModule::update(long currentTime) {
     bufPrn << "app-version " << APP_VERSION << "\n";
     bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
     bufPrn << "clock " << currentTime << "\n";
-    bufPrn << "touch-button/pressed " << touchButtonPressed << "\n";
+    bufPrn << "touch-button/pressed " << touchButtonIsDown << "\n";
     bufPrn << "touch-button/last-pressed " << touchButtonLastPressed << "\n";
     
 #ifdef ES2021_I2C0_SDA
@@ -699,14 +701,18 @@ using TLIBuffer = TOGoS::Command::TLIBuffer;
 
 TLIBuffer commandBuffer;
 
-void drawBackground() {
-  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
-  
-  ssd1306.clear();
+void drawTitleBar(boolean invert, TOGoS::SSD1306::Printer &printer) {
   ssd1306.gotoRowCol(0,0);
+  printer.setXor(invert ? 0xFF : 00);
   printer << APP_SHORT_NAME << " " << APP_VERSION;
   
-  drawConnectionIndicators();
+  drawConnectionIndicators(printer);
+  printer.setXor(0x00);
+}
+
+void drawBackground(TOGoS::SSD1306::Printer &printer) {
+  ssd1306.clear();
+  drawTitleBar(touchButtonIsDown, printer);
 }
 
 // TODO: Have a method on printer to print arbitrary glyphs
@@ -719,9 +725,7 @@ void printGlyph(TOGoS::SSD1306::Driver &driver, const uint8_t *data, int size) {
   }
 }
 
-void drawConnectionIndicators() {
-  TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
-  
+void drawConnectionIndicators(TOGoS::SSD1306::Printer &printer) {
   ssd1306.gotoRowCol(0,112);
   printGlyph(ssd1306, WiFi.status() == WL_CONNECTED ? wifiIcon : noWifiIcon, 8);
   
@@ -731,7 +735,7 @@ void drawConnectionIndicators() {
 
 // TODO: I guess I need a different staleness bar per sensor?
 // Unless there's only one.  :-P
-void redrawStalenessBar() {
+void drawStalenessBar(TOGoS::SSD1306::Printer &printer) {
   int screenWidth = ssd1306.getColumnCount();
   ssd1306.gotoRowCol(1,0);
   long timeSincePreviousReading = millis() - temhum0Cache.time;
@@ -837,11 +841,25 @@ Timestamp lastReadingRedraw = 0;
 Timestamp lastConnectionRedraw = 0;
 Timestamp lastReadingToSerial = 0;
 
-void maybeUpdateSht20Reading(ES2021Reading &cache, long currentTime, int sda, int scl);
+boolean maybeUpdate(Timestamp &lastUpdate, Timestamp currentTime, long interval);
 
-void maybeUpdateSht20Reading(ES2021Reading &cache, long currentTime, int sda, int scl) {
-  if( currentTime - cache.time > shtPollInterval ) {
+boolean maybeUpdate(Timestamp &lastUpdate, Timestamp currentTime, long interval) {
+  if( currentTime - lastUpdate > interval ) {
+    lastUpdate = currentTime;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+boolean maybeUpdateSht20Reading(ES2021Reading &cache, Timestamp currentTime, int sda, int scl);
+
+boolean maybeUpdateSht20Reading(ES2021Reading &cache, Timestamp currentTime, int sda, int scl) {
+  if( maybeUpdate(cache.time, currentTime, shtPollInterval) ) {
     updateSht20Reading(cache, currentTime, sda, scl);
+    return true;
+  } else {
+    return false;
   }
 }
 
@@ -875,7 +893,11 @@ void setup() {
   Serial << "# And writing to it...\n";
   ssd1306.displayOn();
   ssd1306.setBrightness(255);
-  drawBackground();
+
+  {
+    TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+    drawBackground(printer);
+  }
   
   Serial << "# We managed to not crash during boot!\n";
   Serial << "# Type 'help' for help.\n";
@@ -907,23 +929,25 @@ void checkTouchButton(Timestamp currentTime);
 
 void checkTouchButton(Timestamp currentTime) {
 #ifdef ES2021_TOUCH_BUTTON_PIN
-  int pressed = digitalRead(ES2021_TOUCH_BUTTON_PIN) ^ ES2021_TOUCH_BUTTON_ACTIVE_LOW;
+  int isDown = digitalRead(ES2021_TOUCH_BUTTON_PIN) ^ ES2021_TOUCH_BUTTON_ACTIVE_LOW;
   if( serialVerbosity >= VERB_NORMAL ) {
-    if( pressed && !touchButtonPressed ) {
-      Serial << "# Button down\n";
-    } else if( touchButtonPressed && !pressed ) {
-      Serial << "# Button up\n";
+    if( isDown != touchButtonIsDown ) {
+      if( isDown ) Serial << "# Button down\n";
+      else Serial << "# Button up\n";
     }
+    titleBarNeedsRedraw = true;
   }
-  touchButtonPressed = pressed;
-  if( touchButtonPressed ) {
+  touchButtonIsDown = isDown;
+  if( touchButtonIsDown ) {
     touchButtonLastPressed = currentTime;
   }
 #endif
 }
 
+// int displayMode = 0;
+
 void loop() {
-  const boolean loopDebug = false;
+  const boolean loopDebug = serialVerbosity >= VERB_DEBUG;
   
   if( loopDebug ) Serial << "# Loop: begin\n";
   currentTime = millis();
@@ -952,7 +976,7 @@ void loop() {
 
   Timestamp lastReadingUpdate = 0;
   bool publishToMqtt   = (currentTime - latestMqttPublishTime > 15000) && mqttMaintainer.isConnected();
-  bool publishToSerial = serialVerbosity >= VERB_DEBUG || (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial   >  5000);
+  bool publishToSerial = serialVerbosity >= VERB_MORE_INFO || (serialVerbosity >= VERB_INFO) && (currentTime - lastReadingToSerial > 5000);
   uint8_t pubDest = 0;
   if( publishToSerial ) {
     pubDest |= PUB_SERIAL;
@@ -972,51 +996,69 @@ void loop() {
   if( loopDebug ) Serial << "# Loop: Publish data...\n";
   
   publishAttr("clock", currentTime, pubDest);
-  publishAttr("touch-button/pressed", touchButtonPressed, pubDest);
+  publishAttr("touch-button/pressed", touchButtonIsDown, pubDest);
   publishAttr("touch-button/last-pressed", touchButtonLastPressed, pubDest);
-  
+
+  // Limit sensor reading to one per tick, to keep everything snappy
+  boolean didSensorRead = false;
 #ifdef ES2021_I2C0_SDA
-  maybeUpdateSht20Reading(temhum0Cache, currentTime, ES2021_I2C0_SDA, ES2021_I2C0_SCL);
-  lastReadingUpdate = max(temhum0Cache.time, lastReadingUpdate);
-  reportReading("temhum0", temhum0Cache, pubDest);
+  if( !didSensorRead ) {
+    didSensorRead = maybeUpdateSht20Reading(temhum0Cache, currentTime, ES2021_I2C0_SDA, ES2021_I2C0_SCL);
+    lastReadingUpdate = max(temhum0Cache.time, lastReadingUpdate);
+    reportReading("temhum0", temhum0Cache, pubDest);
+  }
 #endif
 #ifdef ES2021_I2C1_SDA
-  maybeUpdateSht20Reading(temhum1Cache, currentTime, ES2021_I2C1_SDA, ES2021_I2C1_SCL);
-  lastReadingUpdate = max(temhum1Cache.time, lastReadingUpdate);
-  reportReading("temhum1", temhum1Cache, pubDest);
+  if( !didSensorRead ) {
+    didSensorRead = maybeUpdateSht20Reading(temhum1Cache, currentTime, ES2021_I2C1_SDA, ES2021_I2C1_SCL);
+    lastReadingUpdate = max(temhum1Cache.time, lastReadingUpdate);
+    reportReading("temhum1", temhum1Cache, pubDest);
+  }
 #endif
 #ifdef ES2021_I2C2_SDA
-  maybeUpdateSht20Reading(temhum2Cache, currentTime, ES2021_I2C2_SDA, ES2021_I2C2_SCL);
-  lastReadingUpdate = max(temhum2Cache.time, lastReadingUpdate);
-  reportReading("temhum2", temhum2Cache, pubDest);
+  if( !didSensorRead ) {
+    didSensorRead = maybeUpdateSht20Reading(temhum2Cache, currentTime, ES2021_I2C2_SDA, ES2021_I2C2_SCL);
+    lastReadingUpdate = max(temhum2Cache.time, lastReadingUpdate);
+    reportReading("temhum2", temhum2Cache, pubDest);
+  }
 #endif
 #ifdef ES2021_I2C3_SDA
-  maybeUpdateSht20Reading(temhum3Cache, currentTime, ES2021_I2C3_SDA, ES2021_I2C3_SCL);
-  lastReadingUpdate = max(temhum3Cache.time, lastReadingUpdate);
-  reportReading("temhum3", temhum3Cache, pubDest);
+  if( !didSensorRead ) {
+    didSensorRead = maybeUpdateSht20Reading(temhum3Cache, currentTime, ES2021_I2C3_SDA, ES2021_I2C3_SCL);
+    lastReadingUpdate = max(temhum3Cache.time, lastReadingUpdate);
+    reportReading("temhum3", temhum3Cache, pubDest);
+  }
 #endif
   
   setWireBus(ES2021_I2C0_SDA, ES2021_I2C0_SCL);
-  
-  if( currentTime - lastConnectionRedraw > 1000 ) {
-    drawConnectionIndicators();
-    lastConnectionRedraw = currentTime;
-  }
-  
-  if( lastReadingUpdate > lastReadingRedraw ) {
-    // TODO: Draw them all?
+
+  {
+    TOGoS::SSD1306::Printer printer(ssd1306, TOGoS::SSD1306::font8x8);
+    
+    if( currentTime - lastConnectionRedraw > 1000 ) {
+      drawConnectionIndicators(printer);
+      lastConnectionRedraw = currentTime;
+    }
+    
+    if( lastReadingUpdate > lastReadingRedraw ) {
+      // TODO: Draw them all?
 #ifdef ES2021_I2C0_SDA
-    redrawReading(temhum0Cache);
+      redrawReading(temhum0Cache);
 #endif
-    lastReadingRedraw = currentTime;
+      lastReadingRedraw = currentTime;
+    }
+    
+    if( titleBarNeedsRedraw ) {
+      drawTitleBar(touchButtonIsDown, printer);
+      titleBarNeedsRedraw = false;
+    }
+    if( loopDebug ) Serial << "# Loop: drawStalenessBar()...\n";
+    drawStalenessBar(printer);
   }
 
   if( publishToSerial ) {
     Serial << "\n";
   }
-  
-  if( loopDebug ) Serial << "# Loop: redrawStalenessBar()...\n";
-  redrawStalenessBar();
   
   if( loopDebug ) Serial << "# Loop: Wifi update...\n";
   wifiUpdate();
