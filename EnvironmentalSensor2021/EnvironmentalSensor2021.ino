@@ -1,5 +1,5 @@
 /*
- * Tested with TOGoSArduinoLibs2021 commit 0788e42ef28ed0d169efb8b367b79a54d0f22549
+ * Tested with TOGoSArduinoLibs2021 commit 40261578159e7a7e38013363ef9d506eb669f2e6
  * 
  * Default wiring (can be overridden in config.h):
  * - D1 = I2C shared clock (usually yellow wire)
@@ -702,7 +702,7 @@ using TLIBuffer = TOGoS::Command::TLIBuffer;
 TLIBuffer commandBuffer;
 
 void drawTitleBar(boolean invert, TOGoS::SSD1306::Printer &printer) {
-  ssd1306.gotoRowCol(0,0);
+  printer.gotoRowCol(0,0);
   printer.setXor(invert ? 0xFF : 00);
   printer << APP_SHORT_NAME << " " << APP_VERSION;
   
@@ -726,10 +726,10 @@ void printGlyph(TOGoS::SSD1306::Driver &driver, const uint8_t *data, int size) {
 }
 
 void drawConnectionIndicators(TOGoS::SSD1306::Printer &printer) {
-  ssd1306.gotoRowCol(0,112);
+  printer.gotoRowCol(0,112);
   printGlyph(ssd1306, WiFi.status() == WL_CONNECTED ? wifiIcon : noWifiIcon, 8);
   
-  ssd1306.gotoRowCol(0,120);
+  printer.gotoRowCol(0,120);
   printer << (mqttMaintainer.isConnected() ? "M" : ".");
 }
 
@@ -737,7 +737,7 @@ void drawConnectionIndicators(TOGoS::SSD1306::Printer &printer) {
 // Unless there's only one.  :-P
 void drawStalenessBar(TOGoS::SSD1306::Printer &printer) {
   int screenWidth = ssd1306.getColumnCount();
-  ssd1306.gotoRowCol(1,0);
+  printer.gotoRowCol(1,0);
   long timeSincePreviousReading = millis() - temhum0Cache.time;
   int stalenessBarWidth = screenWidth * std::min((unsigned int)4000,(unsigned int)timeSincePreviousReading) / 4000;
   for( int i=0; i<stalenessBarWidth; ++i ) {
@@ -803,7 +803,7 @@ void printNNDotN(float num, TOGoS::SSD1306::Printer &printer) {
 
 void drawReadingLine(const TOGoS::SHT20::EverythingReading &data, int row, TOGoS::SSD1306::Printer &printer) {
   // TODO: Have printer proxy gotoRowCol to the SSD1306 so we don't have to reference it directly
-  ssd1306.gotoRowCol(row,0);
+  printer.gotoRowCol(row,0);
   if( data.temperature.isValid() ) {
     printNN(data.getTemperatureF(), printer);
     printer << "F ";
@@ -828,11 +828,11 @@ void drawReadingLineIfNew(const ES2021Reading &cache, Timestamp currentTime, int
 
 void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306::Printer &printer);
 void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306::Printer &printer) {
-  ssd1306.gotoRowCol(2,0);
+  printer.gotoRowCol(2,0);
   printer << "Temperature:";
   printer.clearToEndOfRow();
   
-  ssd1306.gotoRowCol(3,12);
+  printer.gotoRowCol(3,12);
   if( data.temperature.isValid() ) {
     printer.print(data.getTemperatureF(),1);
     printer << "F / ";
@@ -843,11 +843,11 @@ void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306
   }
   printer.clearToEndOfRow();
   
-  ssd1306.gotoRowCol(4,0);
+  printer.gotoRowCol(4,0);
   printer << "Humidity:";
   printer.clearToEndOfRow();
   
-  ssd1306.gotoRowCol(5,12);
+  printer.gotoRowCol(5,12);
   if( data.humidity.isValid() ) {
     printer.print(data.getRhPercent(),1);
     printer << "%";
@@ -856,7 +856,7 @@ void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306
   }
   printer.clearToEndOfRow();
   
-  ssd1306.gotoRowCol(6,0);
+  printer.gotoRowCol(6,0);
   printer << "VPD: ";
   if( data.isValid() ) {
     printer.print(data.getVpdKpa(),1);
@@ -864,7 +864,7 @@ void drawReadingFull(const TOGoS::SHT20::EverythingReading &data, TOGoS::SSD1306
   }
   printer.clearToEndOfRow();
   
-  ssd1306.gotoRowCol(7,0);
+  printer.gotoRowCol(7,0);
   if( data.isValid() ) {
     printer << "DP : ";
     printer.print(data.getDewPoint().getF(),0);
