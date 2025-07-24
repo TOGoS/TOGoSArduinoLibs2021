@@ -279,7 +279,7 @@ by their respective pins.
 ** 2025-07-12 - wiring documented
 
 ES2021 'full wiring' (all peripherals) documented in [[./EnvironmentalSensor2021/Wiring.dxf][EnvironmentalSensor2021/Wiring.dxf]],
-and snapshotted as [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf][EnvironmentalSensor2021Wiring-v0.1.pdf]].
+and snapshotted as [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf][EnvironmentalSensor2021Wiring-v0.1.pdf]] (and [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:HTS6UGQ2KCFDQI4DRCWABZNHKWQVXYUJ.G2YUMX4S2MVPZ3ZX74P5CLOS2KWRKAWQADTTLGY/20250712-EnvironmentalSensor2021Wiring-v0.1-5bit.png][20250712-EnvironmentalSensor2021Wiring-v0.1-5bit.png]]).
 
 I seem to have broken one of my OLED screens by cramming it into a hole that it didn't quite fit into
 (WSITEM-201768's hole before I filed it out).  I found one more.  So I'm about out of these
@@ -300,6 +300,36 @@ and I suppose I should order more if I want to have them around.
 
 That easily fits in a packet, so no need to compress.
 
+*** Assembly
+
+All seems well.
+
+Let's call the current assembly WSITEM-201770.
+
+** 2025-07-24 - Thoughts about polishing
+
+Might be useful to be able to send ~#HELO/get~ packets to the thing
+and have it respond -- this would allow:
+- Getting updates at a different rate than the broadcast packets
+- Getting data on e.g. Windows machines that can't receive the broadcasts!
+
+Screen issues;
+- "ES2021" is "vS2021" (I think because the "0.0.13-dev" wraps around!)
+- Might want to periodically reinitialize screen so that it continues to work
+  when dis/reconnected
+- Bottom row is garbage!  Clear that out!
+
+[[https://www.nuke24.net/docs/2025/WSITEM-201770.html][WSITEM-201770]]'s screen is kinda dim.  I wondered if giving 5V instead of 3.3V would help,
+since [[https://www.ebay.com/itm/294691149010][product page of most recently bought ones]] says "Voltage: 3V ~ 5V DC".
+Tested with another screen that it is at least allowed -- nothing blows up,
+but this new screen is bright either way.
+
+Finally tested WSITEM-201770's current screen.  No brighter at 5V either.
+
+Which means, unless I'm forgetting something about these WeMos D1 minis,
+there's nothing on the board that requires more than 3.3V, and you could
+power the whole thing from the I2C/SHT20 port if you wanted.
+
 ** TODO
 
 - [X] Document wiring
@@ -313,5 +343,5 @@ That easily fits in a packet, so no need to compress.
   - 1" rails should do the job (see WSITEM-3424 p53, 'way 3')
 - [X] Indicate on screen when button pressed
 - [X] Make alternate screen mode to show T/H from all four sensors at once
-- [ ] Cut a version, maybe call this v0.0.12.
+- [X] Cut a version, maybe call this v0.0.12.
 - [ ] Print one giant panel so this can all be wired up easily
