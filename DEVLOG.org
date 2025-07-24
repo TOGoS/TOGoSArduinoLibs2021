@@ -1,0 +1,347 @@
+#+TITLE: TOGoS Arduino Apps Development Log
+
+** Library locations
+
+Core libraries,
+installed libraries,
+and 'board' libraries
+are all in totally different places!
+
+- Boards :: ~C:\Users\TOGoS\AppData\Local\Arduino15\packages~
+  - e.g. the esp8266 WiFi library (part of it, anyway) is at ~c:/Users/TOGoS/AppData/Local/Arduino15/packages/esp8266/hardware/esp8266/3.0.2/libraries/ESP8266WiFi/src/ESP8266WiFiSTA.h~
+- Core Libraries :: ~C:\Program Files (x86)\Arduino\libraries~
+- Installed Libraries :: ~C:\Users\TOGoS\Documents\Arduino\libraries~
+  - e.g. the Nick O'Leary PubSubClient that I like is in ~"C:\Users\TOGoS\Documents\Arduino\libraries\PubSubClient"~
+
+** Pins
+
+*** Detailed ESP8266 Pin Guide
+
+(copied from [[x-git-object:682a03fc048dce3563cd47c68e055c5fae5a32cf#2018/ESP8266/ESP8266.org][ProjectNotes2/2018/ESP8266/ESP8266.org]])
+
+[[https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/][This guide]] might be good.
+Note that you can mess up boot by connecting D3, D5, or TX to low or D8 to high
+
+| Label | GPIO   | Input        | Output        | Notes                                                         |
+|-------+--------+--------------+---------------+---------------------------------------------------------------|
+| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                    |
+| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C)                                       |
+| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                       |
+| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW           |
+| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW            |
+| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                    |
+| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                    |
+| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                    |
+| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                           |
+| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                  |
+| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW |
+| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                    |
+
+
+** 2025-06-10 - HELODemo - IPv6 on ESP8266 research
+
+Looking at the ESP8266WiFi > IPv6 example.
+
+It seems I need to select Tools > 'lwIP variant' = 'v2 IPv6 Lower Memory' or somesuch in order to get it to IPv6 at all.
+
+Then I get output like:
+
+#+begin_example
+------------------------------
+SDK:2.2.2-dev(38a443e)/Core:3.0.2=30002000/lwIP:IPv6+STABLE-2_1_2_RELEASE/glue:1.2-48-g7421258/BearSSL:6105635
+dns0: 192.168.9.1
+dns1: 2600:1702:7ab0:ac10::1
+Try me at these addresses:
+(with 'telnet <addr> or 'nc -u <addr> 23')
+IF='st' IPv6=0 local=0 hostname='ESP-34447B' addr= 192.168.9.161 / mask:255.255.255.0 / gw:192.168.9.1
+IF='st' IPv6=1 local=1 hostname='ESP-34447B' addr= fe80::5ecf:7fff:fe34:447b
+IF='st' IPv6=1 local=0 hostname='ESP-34447B' addr= 2600:1702:7ab0:ac10:5ecf:7fff:fe34:447b
+resolving www.google.com: 172.253.124.106
+resolving ipv6.google.com: 2607:f8b0:4002:c00::71
+resolving www.google.com: 172.253.124.106
+resolving www.yahoo.com: 2001:4998:60:807::1
+------------------------------
+#+end_example
+
+It still connects to the IPv4 network.
+I kind of don't want to do that.
+The whole point was to avoid cluttering my local network's limited space!
+
+But I maybe could use [[https://docs.arduino.cc/libraries/wifi/#%60WiFi.config()%60][WiFi.config(ip, dns, gateway, subnet)]] (dns, gateway, subnet are each optional)
+to manually configure some IPv4 address not on my network.
+
+10.9.7.254, let's say, could be the dummy IPv4 address.
+
+*** Other thoughts
+
+A way to get more frequent updates without spamming the network:
+- Broadcast a few updates right away, then seldomly (once per minute or something)
+- A 'client' can send a packet indicating its interest, maybe every few minutes,
+  and the device will then send packets to that device more often,
+  and maybe in more detail.
+  - Could be a ~#HELO/SUBSCRIBE /topic~ kind of thing!
+
+** 2025-06-12 - HELODemo - Next steps
+
+*** DONE Decide on a standard HELO UDP port
+
+16378 is not mentioned on https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers, so that.
+
+Published update to https://www.nuke24.net/docs/2025/HELO.html.
+
+*** TODO Broadcast a UDP packet
+
+Some findings:
+
+Broadcasting to ~ff02::1~, either from the device or using ~nc~, works,
+and I can receive the packet using ~nc~ or using ~udplisten.ts~ on another Linux machine.
+
+On Windows I can't seem to receive the broadcast packets, even after changing some firewall settings.
+But I can receive the packets sent directly to my link-local IPv6 address
+(this is all using ~udplisten.ts~).
+
+Note: ~nc~ seems to require the device to be specified (e.g. ~ff02::1%enp4s0~) when sending packets,
+but not when listening.
+
+Note: ~nc~ has a ~-b~ option to 'allow broadcast', but I think that's only relevant to IPv4.
+IPv6 has special addresses for broadcasting so doesn't need that bit, and ~nc~ will say
+"Protocol not available" if you tell it to ~-b~ when sending a UDP packet over IPv6.
+
+Note: ~nc~ picks a random port to send from unless you indicate a different source port with ~-p~.
+
+Note: ~nc~ seems to ignore end-of-input-stream, and you have to C-c to kill it.
+Alternatively you can ~-q 1~ to have it quit after one second, but this seems
+to be one second after sending something out...or after EOF is reached?
+~-q 0~ works when I typre stuff in but not when ~echo~ing input to it.
+
+**** Listening with nc
+
+#+begin_src bash
+nc -u -l :: 16378
+#+end_src
+
+#+begin_example
+#HELO
+
+What's up lamo
+#+end_example
+
+Nc seems to only spit out the first packet received.
+
+**** Listening with UDPListen.ts
+
+#+begin_src bash
+deno run --allow-net --unstable-net UDPListen.ts [::]:16378
+#+end_src
+
+#+begin_example
+Received 21 bytes from {"hostname":"fe80::5ecf:7fff:fe34:447b","port":16378,"transport":"udp"}: 2348454c4f0a0a576861742773207570206c616d6f
+#+end_example
+
+**** Sending with nc
+
+Broadcasting:
+
+#+begin_src bash
+echo foo bar baz | nc -6 -u ff02::1%enp4s0 16378
+#+end_src
+
+Directly to my Windows machine:
+
+#+begin_src bash
+nc -6 -u fe80::4a70:73ad:375c:118d%enp4s0 16378
+#+end_src
+
+**** Using nc to forward broadcast packets
+
+#+begin_src bash
+nc -6lu ff02::1%wlp3s0 16378 | nc -6u fe80::4a70:73ad:375c:118d%wlp3s0 16378
+#+end_src
+
+** 2025-06-16 - Reading an SHT20
+
+Horsed around with EnvironmentalSensor2021 a bunch today,
+refactoring it to my latest whims and adding support
+to send a [[https://www.nuke24.net/docs/2025/HELO.html][#HELO]] packet.
+
+Soldering GX12 connectors is pretty fiddly.
+And the wires on [[https://www.aliexpress.us/item/3256804532475698.html][these SHT20s]] are very thin,
+and that makes it more fiddly.
+
+I don't entirely trust the wires inside the plug.
+How are they not touching the sheath?
+Maybe it's not actually metallic,
+or there's a layer of insulation.
+
+Or maybe I should cover everything with heat-shrink tubing
+and fill it with hot glue to be sure.
+
+** 2025-07-05 - Multiple SHT20s?
+
+Tried sharing D1 = SCL, D2 and D3 = SDA.
+This didn't work.  Seemed like the TwoWire library was somehow only 
+D1 = SCL, D2 = SDA, D3 = SCL B, D4 = SDA B works even less;
+now it can't seem to sense either of them.
+
+But also, something is weird with my code.
+When I ~temhum1/read~, the reported ~temhum1/age~ doesn't reset?
+I looked at the functions several times to make sure
+that both ~updateSht20Reading~ and ~reportReading~ use the passed-in ~&cache~ and not
+the global ~sht20ACache~.  What is up with this, hmm...
+
+Maybe I should just get some [[https://learn.adafruit.com/adafruit-tca9548a-1-to-8-i2c-multiplexer-breakout/overview][I2C multiplexerss]] and matching cables.
+
+** 2025-07-05 - MultiSHTDemo
+
+Wrote this while on the bus, so not tested.
+Has several different modes to try and see
+if any of them work.  Maybe re-initializing the I2C
+with different pins will do the job?
+
+** 2025-07-06 - MultiSHTDemo continued
+
+At my desk at home; now I can try it out.
+Fixed some bugs.
+
+| Mode                       | Reads  | Reads  |                              |
+|                            | SHT20A | SHT20B |                              |
+|----------------------------+--------+--------+------------------------------|
+| MSD_MODE_TWO_WIRE          | yes    | no     |                              |
+| MSD_MODE_FOUR_WIRE_REINIT  | yes    | yes    |                              |
+| MSD_MODE_THREE_WIRE_REINIT | yes    | yes    |                              |
+| MSD_MODE_THREE_WIRE        | ...    | yes?   | SHT20A returns SHT20B's data |
+| MSD_MODE_FOUR_WIRE         | ...    | yes?   | SHT20A returns SHT20B's data |
+| MSD_MODE_THREE_WIRE_LOCAL  | yes    | yes    |                              |
+
+
+*** In summary!
+
+The library must be sharing some global variables, because
+having two ~TwoWire~ instances doesn't seem to work.
+May as well just use the global ~Wire~ object?
+
+*** TL;DR
+
+Re-initialize a single I2C instance, or put it in a local variable.
+
+The local variable approach might be less suitable if you also
+have *other* devices on your bus that have stateful driver objects
+associated with the ~TwoWire~ instance.
+
+** 2025-07-08 - Try four SHT20s!
+
+It seems to help if I don't hook D6 to a sensor,
+so I have SCL = D1, SDA = D2, D3, D4, and D7.
+
+Aaand it seems to work, so on to building a nicer enclosure
+and updating EnvironmentalSensor2021 to handle multiple
+SHT20s in the way demonstrated by [[https://raw.githubusercontent.com/TOGoS/TOGoSArduinoLibs2021/refs/heads/master/TOGoSSHT20/examples/MultipleSHT20s/MultipleSHT20s.ino][MultipleSHT20s.ino]].
+
+** 2025-07-10 - Adding a button
+
+For some reason there seems to be a long delay while trying to read
+sensor data...which may have been because one of the sensors had SCL
+and SDA plugged in but not power.
+
+After solving that, the new button logic seems to work okay.
+
+** 2025-07-11 - Prototype wired up!
+
+#+CAPTION: prototype wiring
+[[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:XQPYICR6KE46CHB2B4Y3MBUEECLLBQRL.KB6NERA3NS4GM3I7PZR77FEBCV65CUBNTJJL4QI/20250711_125635.jpg]]
+
+Supports:
+- Four sensors
+- One little OLED display
+- One button (not hooked up in photo)
+
+Currently only the first sensor, ~temhum0~, will be reported on the screen.
+
+*** Wiring
+
+I am using a small breadboard with two blocks of 17 columns x 5 rows,
+with the WeMos D1 at one end, so that the antenna sticks off the end as much as possible.
+All the 'shared' pins (3V3, GND, SCL, SDA0, in that order so that the display can plug right into those four columns)
+are broken out from under the WeMos to the other end of the breadboard.
+This leaves one row on each side of the board where the sensors can plug in
+by their respective pins.
+
+- D1 = I2C shared clock (usually yellow wire)
+- D2 = I2C 0 data (usually green or white wire)
+- D3 = I2C 1 data (usually green or white wire)
+- D4 = LED_BUILTIN
+- D5 to peripheras' power - (this way it will be unpowered while the ESP is asleep) (usually black wire)
+- D6 = I2C 2 data (usually green or white wire)
+- D7 = I2C 3 data (usually green or white wire)
+- D8 = 'touch button' with pull-down (so button should short to 3V3)
+- 3V3 to peripherals' power + (usually red wire)
+
+** 2025-07-12 - wiring documented
+
+ES2021 'full wiring' (all peripherals) documented in [[./EnvironmentalSensor2021/Wiring.dxf][EnvironmentalSensor2021/Wiring.dxf]],
+and snapshotted as [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf][EnvironmentalSensor2021Wiring-v0.1.pdf]] (and [[http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:HTS6UGQ2KCFDQI4DRCWABZNHKWQVXYUJ.G2YUMX4S2MVPZ3ZX74P5CLOS2KWRKAWQADTTLGY/20250712-EnvironmentalSensor2021Wiring-v0.1-5bit.png][20250712-EnvironmentalSensor2021Wiring-v0.1-5bit.png]]).
+
+I seem to have broken one of my OLED screens by cramming it into a hole that it didn't quite fit into
+(WSITEM-201768's hole before I filed it out).  I found one more.  So I'm about out of these
+and I suppose I should order more if I want to have them around.
+
+** 2025-07-13 - Wiring it all up!
+
+*** Q: How big the packets?
+
+| Sensor |    size |
+|  count | (bytes) |
+|--------+---------|
+|      0 |     345 |
+|      1 |     431 |
+|      2 |     517 |
+|      3 |     603 |
+|      4 |     689 |
+
+That easily fits in a packet, so no need to compress.
+
+*** Assembly
+
+All seems well.
+
+Let's call the current assembly WSITEM-201770.
+
+** 2025-07-24 - Thoughts about polishing
+
+Might be useful to be able to send ~#HELO/get~ packets to the thing
+and have it respond -- this would allow:
+- Getting updates at a different rate than the broadcast packets
+- Getting data on e.g. Windows machines that can't receive the broadcasts!
+
+Screen issues;
+- "ES2021" is "vS2021" (I think because the "0.0.13-dev" wraps around!)
+- Might want to periodically reinitialize screen so that it continues to work
+  when dis/reconnected
+- Bottom row is garbage!  Clear that out!
+
+[[https://www.nuke24.net/docs/2025/WSITEM-201770.html][WSITEM-201770]]'s screen is kinda dim.  I wondered if giving 5V instead of 3.3V would help,
+since [[https://www.ebay.com/itm/294691149010][product page of most recently bought ones]] says "Voltage: 3V ~ 5V DC".
+Tested with another screen that it is at least allowed -- nothing blows up,
+but this new screen is bright either way.
+
+Finally tested WSITEM-201770's current screen.  No brighter at 5V either.
+
+Which means, unless I'm forgetting something about these WeMos D1 minis,
+there's nothing on the board that requires more than 3.3V, and you could
+power the whole thing from the I2C/SHT20 port if you wanted.
+
+** TODO
+
+- [X] Document wiring
+- [X] Include pic
+- [X] Buy more little SSD1306 OLED displays
+  - WSORDER-300221
+- [X] Prototype a panel for the display (maybe with the button under it?)
+- [X] I think this case isn't going to be quite deep enough.  Print a deeper one!  9" long!
+  ...or pring a couple of 'spacer rails' or something.
+  Maybe that's how these things could be assembled.
+  - 1" rails should do the job (see WSITEM-3424 p53, 'way 3')
+- [X] Indicate on screen when button pressed
+- [X] Make alternate screen mode to show T/H from all four sensors at once
+- [X] Cut a version, maybe call this v0.0.12.
+- [ ] Print one giant panel so this can all be wired up easily
