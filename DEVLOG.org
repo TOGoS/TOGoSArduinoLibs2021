@@ -330,7 +330,7 @@ Which means, unless I'm forgetting something about these WeMos D1 minis,
 there's nothing on the board that requires more than 3.3V, and you could
 power the whole thing from the I2C/SHT20 port if you wanted.
 
-** TODO
+** DONE Various tasks
 
 - [X] Document wiring
 - [X] Include pic
@@ -344,4 +344,122 @@ power the whole thing from the I2C/SHT20 port if you wanted.
 - [X] Indicate on screen when button pressed
 - [X] Make alternate screen mode to show T/H from all four sensors at once
 - [X] Cut a version, maybe call this v0.0.12.
-- [ ] Print one giant panel so this can all be wired up easily
+- [X] Print one giant panel so this can all be wired up easily
+  - Well, a small one; WSITEM-201875 + innards + lid being an example, using part set p2124,
+    i.e. Set of p2088, p2089, p2094
+
+** [2025-10-18]
+
+I wired the thing up and got it to work, receiving a packet using `nc -u -l :: 16378` once.
+
+#+begin_example
+#HELO
+
+app-name EnvironmentalSensor2021
+app-version 0.0.13-dev
+mac 60:01:94:70:2D:0B
+clock 593012
+touch-button/pressed 0
+touch-button/last-pressed 0
+temhum0/last-read 592339
+temhum0/connected true
+temhum0/temperature/c 23.45
+temhum0/temperature/f 74.22
+temhum0/humidity/percent 59.46
+temhum1/last-read 592339
+temhum1/connected false
+temhum2/last-read 592778
+temhum2/connected false
+temhum3/last-read 593012
+temhum3/connected false
+#+end_example
+
+Commentary by me:
+
+- Waiting for it to automatically update after being powered on...
+- [19:09]: Waiting!
+- [19:13] Still waiting.
+- Okay now I am running temhum0/read at 19:22, to try to force it to update.  Thsi is redick.
+- Hmm, seems like it died or something?
+- Restarted at [19:24]
+- Still didn't send anything.
+
+Potential sources of not seeing more data:
+- 'Nc seems to only spit out the first packet received' (something I discovered earlier)
+- ES2021 only occasionally sending new HELO packets (how often?)
+and
+
+It would be nice to report when ~#status~
+- [ ] Exact version of the software
+- [ ] HELO port
+- [ ] When the last HELP packet was sent, how long until the next one
+  - Note that ~verbosity/set 60~ will also reveal this!
+
+[2025-10-18T19:33]: Would I have more luck with ~HELODemo/UDPListen.ts~?
+
+#+begin_src 
+deno run --allow-net --unstable-net UDPListen.ts [::]:16378
+#+end_src
+
+HMM NOPE, NOT SEEING 'EM, even though I am being told over serial that
+it is connected to WiFi and broadcasting HELO packets.
+
+Oh, maybe it was *not* connected to WiFi for some reason.
+Maybe it forgot the network?
+
+After running ~wifi/connect~ with my SSID and password,
+that invocation of ~UDPListen.ts~ is now showing stuff showing up.
+Stuff like
+
+#+begin_example
+Received 431 bytes from {"hostname":"fe80::6201:94ff:fe70:2d0b","port":55317,"transport":"udp"}: text:
+  #HELO
+
+  app-name EnvironmentalSensor2021
+  app-version 0.0.13-dev
+  mac 60:01:94:70:2D:0B
+  clock 956657
+  touch-button/pressed 0
+  touch-button/last-pressed 0
+  temhum0/last-read 955681
+  temhum0/connected true
+  temhum0/temperature/c 24.38
+  temhum0/temperature/f 75.88
+  temhum0/humidity/percent 55.94
+  temhum1/last-read 955953
+  temhum1/connected false
+  temhum2/last-read 956189
+  temhum2/connected false
+  temhum3/last-read 956423
+  temhum3/connected false
+#+end_example
+
+[2025-10-18T19:40]: What if I power it off and back on??
+
+#+begin_example
+# Number of wifi networks to which I'll attempt to auto-connect;
+# (if zero, I may attempt to just begin(); maybe that should be a setting):
+wifi-config/wifi-network-count 0
+net-config/use-static-ip4 true
+wifi/mac-address 60:01:94:70:2D:0B
+wifi/status-code 0
+wifi/ssid 
+wifi/connected false
+wifi/auto-connect true
+wifi/auto-reconnect true
+net/ipv6-enabled true
+net/addr IF='st' IPv6=1 local=1 hostname='ESP-702D0B' addr= fe80::6201:94ff:fe70:2d0b
+mqtt/server/host 
+mqtt/server/port 0
+mqtt/connected false
+screen0/row-count 8
+screen0/column-count 128
+# status: Ok
+#+end_example
+
+Hmm.  Maybe that auto-connect-to-last-connected-network
+doesn't work as well as I thought, and I'll need to make
+a branch of sorts with hard-coded networks after all.
+
+Note: With the flat lid, this thing fits perfectly (thickness-wise,
+anyway, and discounting the rubber band) into one of my phone holders.
