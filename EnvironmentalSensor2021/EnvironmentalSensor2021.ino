@@ -17,6 +17,8 @@
  * See Wiring.dxf, or http://picture-files.nuke24.net/uri-res/raw/urn:bitprint:LQJEUHRR2MHJTYJTHHZ4RYAWBDZR2ACS.C7LMOJ47BI3WH7BOXCUQ7U3DNQPMKAKGFXSC7GQ/EnvironmentalSensor2021Wiring-v0.1.pdf
  */
 
+#include "preprocfun.h"
+
 //// Begin configuration section
 
 const char *APP_NAME = "EnvironmentalSensor2021";
@@ -51,6 +53,12 @@ const long shtPollInterval = 1000;
 #include "config.h"
 
 //// End configuration section
+
+#ifdef ES2021_CONFIG_FILE_HASH
+const char *CONFIG_HASH = ES2021_STRINGIFY(ES2021_CONFIG_FILE_HASH);
+#else
+const char *CONFIG_HASH = nullptr;
+#endif
 
 extern "C" {
   #include <stdlib.h> // atol
@@ -422,6 +430,9 @@ void HeloModule::update(long currentTime) {
     bufPrn << "\n";
     bufPrn << "app-name " << APP_NAME << "\n";
     bufPrn << "app-version " << APP_VERSION << "\n";
+    if( CONFIG_HASH != nullptr ) {
+      bufPrn << "config-hash " << CONFIG_HASH << "\n";
+    }
     bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
     bufPrn << "clock " << currentTime << "\n";
     bufPrn << "touch-button/pressed " << touchButtonIsDown << "\n";
@@ -554,7 +565,10 @@ void printConstants(Print &out) {
 struct Henlo {} HENLO;
 
 Print &operator<<(Print &p, const struct Henlo &hi) {
-  return p << "# Hello from " << APP_NAME << " v" << APP_VERSION << "!";
+  p << "# Hello from " << APP_NAME << " v" << APP_VERSION;
+  if( CONFIG_HASH != nullptr ) p << "-" << CONFIG_HASH;
+  p << "!";
+  return p;
 }
 
 CommandResult readSht20Cmd(ES2021Reading &cache, int sda, int scl);
