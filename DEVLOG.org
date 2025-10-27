@@ -390,9 +390,12 @@ Potential sources of not seeing more data:
 and
 
 It would be nice to report when ~#status~
-- [ ] Exact version of the software
-- [ ] HELO port
-- [ ] When the last HELP packet was sent, how long until the next one
+- [X] Exact version of the software
+  - Well, v0.0.14 does provide a standard-ish way to indicate config-hash,
+    which in combination with the app version and the assumption that ~config.h~ is written
+    a certain way, may be good enough.
+- [\] HELO port
+- [\] When the last HELP packet was sent, how long until the next one
   - Note that ~verbosity/set 60~ will also reveal this!
 
 [2025-10-18T19:33]: Would I have more luck with ~HELODemo/UDPListen.ts~?
