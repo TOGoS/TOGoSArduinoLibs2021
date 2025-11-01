@@ -1,7 +1,10 @@
 // D1 is used by https://www.wemos.cc/en/latest/d1_mini_shield/relay.html
 
+#include "version.h"
+
 constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.appName = "RelayTimer",
+	.appVersion = appVersion,
 	.relayControlPin = D1,
 	.relayIsActiveLow = true,
 	.buttonPin = D7,
