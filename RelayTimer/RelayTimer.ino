@@ -63,15 +63,38 @@ namespace TOGoS::Arduino::RelayTimer {
 		LONG_PRESS = 2,
 	};
 
+	class PropConsumer {
+	public:
+		virtual void accept(const char *name, const char *value);
+		virtual void accept(const char *name, unsigned long value);
+	};
+
+	class PrefixPropConsumer : public PropConsumer {
+		Print &printer;
+		const char *prefix;
+		const char *kvSep;
+		const char *postfix;
+	public:
+		PrefixPropConsumer(Print &printer, const char *prefix, const char *kvSep, const char *postfix) :
+			printer(printer), prefix(prefix), kvSep(kvSep), postfix(postfix) { }
+		void accept(const char *name, const char *value) {
+			printer << prefix << name << kvSep << value << postfix;
+		}
+	   void accept(const char *name, unsigned long value) {
+			printer << prefix << name << kvSep << value << postfix;
+		}
+	};
+	
 	class Timer {
 	public:
 		virtual const char *getName() = 0;
+		virtual void emitProps(PropConsumer &dest) = 0;
 		virtual void reset(unsigned long currentTime) = 0;
 		virtual void input(SBInputEvent type, unsigned long currentTime) = 0;
 		virtual bool isRelayOnAt(unsigned long currentTime) = 0;
 		virtual bool isIndicatorOnAt(unsigned long currentTime) = 0;
 	};
-
+	
 	class OneShotTimer : public Timer {
 	public:
 		unsigned long resetTime = 0;
@@ -81,6 +104,12 @@ namespace TOGoS::Arduino::RelayTimer {
 		const char *getName() {
 			return "OneShotTimer";
 		};
+		void emitProps(PropConsumer &dest) {
+			dest.accept("type", "OneShotTimer");
+			dest.accept("resetTime", resetTime);
+			dest.accept("activeDuration", activeDuration);
+			dest.accept("shortPressTimerIncrement", shortPressTimerIncrement);
+		}
 		void reset(unsigned long currentTime) {
 			this->resetTime = currentTime;
 		}
@@ -134,6 +163,12 @@ namespace TOGoS::Arduino::RelayTimer {
 		const char *getName() {
 			return "LoopTimer";
 		};
+		void emitProps(PropConsumer &dest) {
+			dest.accept("type", "LoopTimer");
+			dest.accept("cycleStartTime", cycleStartTime);
+			dest.accept("cycleDuration", cycleDuration);
+			dest.accept("activeDuration", activeDuration);
+		}
 		void reset(unsigned long currentTime) {
 			this->cycleStartTime = currentTime;
 		}
@@ -183,7 +218,6 @@ std::optional<bool> previousRelayState = false;
 TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
 TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
 
-
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
 	Serial << "# Version: " << appVersion << "\n";
@@ -218,7 +252,9 @@ void printInfo() {
 	Serial << "#  HIGH = " << HIGH << "\n";
 	Serial << "#  LOW  = " << LOW << "\n";
 	Serial << "# Timer:\n";
-	Serial << "#  name = \"" << theTimer->getName() << "\"\n";
+	TOGoS::Arduino::RelayTimer::PrefixPropConsumer infoPropEmitter = TOGoS::Arduino::RelayTimer::PrefixPropConsumer(Serial, "#  ", " = ", "\n");
+	theTimer->emitProps(infoPropEmitter);
+	// Serial << "#  name = \"" << theTimer->getName() << "\"\n";
 }
 
 TLIBuffer commandBuffer;
