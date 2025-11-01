@@ -8,4 +8,12 @@ constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.buttonIsActiveLow = true,
 	// ONE_SHOT or LOOPING
 	.timerMode = TOGoS::Arduino::RelayTimer::ONE_SHOT,
+	.oneShotConfig {
+		//
+		.shortPressTimerIncrement = 1000*3600
+	},
+	//	.loopingConfig {
+	//	.onDuration = 100,
+	//	.loopDuration = 1000*3600*24,
+	//}
 };

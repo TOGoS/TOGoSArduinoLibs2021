@@ -29,6 +29,17 @@ namespace TOGoS::Arduino::RelayTimer {
 		int buttonPin;
 		bool buttonIsActiveLow;
 		TimerMode timerMode;
+		union {
+			struct {
+				// Used by ONE_SHOT
+				unsigned long shortPressTimerIncrement;
+			} oneShotConfig;
+			struct {
+				// Used by LOOPING
+				unsigned long onDuration;
+				unsigned long loopDuration;
+			} loopingConfig;
+		};
 	};
 	
 	template <int pin, bool activeLow>
@@ -66,6 +77,7 @@ namespace TOGoS::Arduino::RelayTimer {
 		unsigned long resetTime = 0;
 		unsigned long activeDuration = 0;
 		unsigned long shortPressTimerIncrement = 1000*3600;
+		OneShotTimer(long shortPressTimerIncrement) : shortPressTimerIncrement(shortPressTimerIncrement) { }
 		const char *getName() {
 			return "OneShotTimer";
 		};
@@ -118,6 +130,7 @@ namespace TOGoS::Arduino::RelayTimer {
 		unsigned long cycleStartTime = 0;
 		unsigned long cycleDuration  = 3600*1000*24;
 		unsigned long activeDuration = 3600*1000*12;
+		LoopTimer(unsigned long onDuration, unsigned long loopDuration) : activeDuration(onDuration), cycleDuration(loopDuration) { }
 		const char *getName() {
 			return "LoopTimer";
 		};
@@ -155,8 +168,13 @@ using TokenizedCommand = TOGoS::Command::TokenizedCommand;
 using SBInputEvent = TOGoS::Arduino::RelayTimer::SBInputEvent;
 
 TOGoS::Arduino::RelayTimer::Timer *theTimer =
-	appConfig.timerMode == TOGoS::Arduino::RelayTimer::TimerMode::ONE_SHOT ? (TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::OneShotTimer() :
-	(TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::LoopTimer();
+	appConfig.timerMode == TOGoS::Arduino::RelayTimer::TimerMode::ONE_SHOT ? (TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::OneShotTimer(
+	   appConfig.oneShotConfig.shortPressTimerIncrement
+   ) :
+	(TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::LoopTimer(
+	   appConfig.loopingConfig.onDuration,
+		appConfig.loopingConfig.loopDuration
+	);
 
 std::optional<long> buttonDownTime = {};
 unsigned long currentTickTime = 0;
