@@ -60,6 +60,7 @@ namespace TOGoS::Arduino::RelayTimer {
 	struct AppConfig {
 		const char *appName;
 		const char *appVersion;
+		const char *sourceRef;
 		int relayControlPin;
 		bool relayIsActiveLow;
 		int buttonPin;
@@ -213,6 +214,7 @@ namespace TOGoS::Arduino::RelayTimer {
 void TOGoS::Arduino::RelayTimer::AppConfig::emitProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) const {
 	dest.accept("appName"          , appName          );
 	dest.accept("appVersion"       , appVersion       );
+	dest.accept("sourceRef"        , sourceRef        );
 	dest.accept("relayControlPin"  , relayControlPin  );
 	dest.accept("relayIsActiveLow" , relayIsActiveLow );
 	dest.accept("buttonPin"        , buttonPin        );
