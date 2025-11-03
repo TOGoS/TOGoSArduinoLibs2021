@@ -11,7 +11,7 @@
 // Requires TOGoSArduinoLibs 56c698e86a76a9cafb81a923b8d2044f01ad5d90
 // (whatever versions of individual libraries that entails)
 
-#define TAA_RELAYTIMER_COARSE_VERSION "3.0.16"
+#define TAA_RELAYTIMER_COARSE_VERSION "3.0.17-dev"
 
 #include <optional>
 
