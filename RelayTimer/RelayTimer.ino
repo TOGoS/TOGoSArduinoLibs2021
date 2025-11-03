@@ -11,7 +11,7 @@
 // Requires TOGoSArduinoLibs 56c698e86a76a9cafb81a923b8d2044f01ad5d90
 // (whatever versions of individual libraries that entails)
 
-#define TAA_RELAYTIMER_COARSE_VERSION "3.0.13"
+#define TAA_RELAYTIMER_COARSE_VERSION "3.0.15-dev"
 
 #include <optional>
 
@@ -221,8 +221,90 @@ void TOGoS::Arduino::RelayTimer::AppConfig::emitProps(TOGoS::Arduino::RelayTimer
 	dest.accept("buttonIsActiveLow", buttonIsActiveLow);
 }
 
+//// Formatting functions
+
+char hexDigit(int num) {
+	num = num & 0xF;
+	if( num < 10 ) return '0' + num;
+	if( num < 16 ) return 'A' + num - 10;
+	return '?'; // Should be unpossible
+}
+
+std::string hexByte(int num) {
+	std::string hecks;
+	hecks += hexDigit(num >> 4);
+	hecks += hexDigit(num);
+	return hecks;
+}
+
+std::string macAddressToHex(uint8_t *macAddress, const char *octetSeparator) {
+	std::string hecks;
+	for( int i = 0; i < 6; ++i ) {
+		if( i > 0 ) hecks += octetSeparator;
+		hecks += hexDigit(macAddress[i] >> 4);
+		hecks += hexDigit(macAddress[i]);
+	}
+	return hecks;
+}
+
+const char *formatBool(int boolish) {
+	return boolish ? "true" : "false";
+}
+
+////
+
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
 #include "config.h"
+
+//// WiFi stuff
+
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
+
+// Copied from EnvironmentalSensor2021
+
+#include <ESP8266WiFi.h>
+
+// TODO: Maybe these should come from appConfig?
+const char *myHostname = NULL; // "relaytimer";
+bool useStaticIp4 = true;
+const byte myIp4[] = {10, 9, 254, 254};
+const byte myIp4Gateway[] = {10, 9, 254, 254};
+const byte myIp4Subnet[] = {255, 255, 255, 255};
+const int myUdpPort = 16378;
+
+void configureWifi(ESP8266WiFiClass &wifi);
+
+void configureWifi(ESP8266WiFiClass &wifi) {
+	if( useStaticIp4 ) {
+		Serial << F("# Configuring with static IPv4 address\n");
+		// Unlike SSID/password, stuff config()ured does *not* seem to be retained.
+		// So we need to wifi.config(...) each time before wifi.begin(...)ing.
+		IPAddress ip4 = myIp4;
+		IPAddress ip4Gateway = myIp4Gateway;
+		IPAddress ip4Subnet = myIp4Subnet;
+		wifi.config(ip4, ip4Gateway, ip4Subnet);
+	}
+	if( myHostname != NULL ) {
+		Serial << F("# Configuring hostname = '") << myHostname << F("'\n");
+		wifi.hostname(myHostname); // This needs to come after `config`
+	}
+	Serial << F("# configureWifi: done\n");
+}
+
+void emitWifiProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
+	byte macAddressBuffer[6];
+	
+	dest.accept("mac-address", macAddressToHex(macAddressBuffer, ":").c_str());
+	dest.accept("status-code", WiFi.status());
+	dest.accept("ssid", WiFi.SSID().c_str());
+	dest.accept("connected", formatBool(WiFi.status() == WL_CONNECTED));
+	dest.accept("auto-connect", formatBool(WiFi.getAutoConnect()));
+	dest.accept("auto-reconnect", formatBool(WiFi.getAutoReconnect()));
+}
+
+#endif
+
+//// End WiFi stuff
 
 using TLIBuffer = TOGoS::Command::TLIBuffer;
 using TokenizedCommand = TOGoS::Command::TokenizedCommand;
@@ -253,6 +335,12 @@ void printHelp() {
 	Serial << "#   info     ; show constants and other info\n";
 	Serial << "#   button/long-press  ; do long-press action\n";
 	Serial << "#   button/short-press ; do short-press action\n";
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
+	Serial << "#   wifi/connect <ssid> <password> ; attempt to connect to WiFi\n";
+	Serial << "#   wifi/connect ; Attempt to connect to WiFi without explicit ssid/password.\n";
+	Serial << "#                ; This may or not actually use the last-configured ssid/password.\n";
+	Serial << "#                ; It may depend on the board, or I may be confised.\n";
+#endif
 }
 
 void emitPinConstants(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
@@ -270,13 +358,22 @@ void emitPinConstants(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
 
 void printInfo() {
 	TOGoS::Arduino::RelayTimer::PrefixPropConsumer infoPropEmitter = TOGoS::Arduino::RelayTimer::PrefixPropConsumer(Serial, "#  ", " = ", "\n");
+	
 	Serial << "# Pins constants:\n";
 	emitPinConstants(infoPropEmitter);
+	
 	Serial << "# App config:\n";
 	appConfig.emitProps(infoPropEmitter);
+	
 	Serial << "# Other constants:\n";
 	Serial << "#  HIGH = " << HIGH << "\n";
 	Serial << "#  LOW  = " << LOW << "\n";
+	
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
+	Serial << "# WiFi:\n";
+	emitWifiProps(infoPropEmitter);
+#endif
+	
 	Serial << "# Timer:\n";
 	theTimer->emitProps(infoPropEmitter);
 	// Serial << "#  name = \"" << theTimer->getName() << "\"\n";
@@ -312,8 +409,20 @@ void processLine(const TOGoS::StringView& line) {
 		theTimer->input(SBInputEvent::SHORT_PRESS, currentTickTime);
 	} else if( tcmd.path == "button/long-press" ) {
 		theTimer->input(SBInputEvent::LONG_PRESS, currentTickTime);
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
+	} else if( tcmd.path == "wifi/connect" ) {
+		if( tcmd.args.size() == 0 ) {
+			configureWifi(WiFi);
+			WiFi.begin();
+		} else if( tcmd.args.size() == 2 ) {
+			configureWifi(WiFi);
+			WiFi.begin(std::string(tcmd.args[0]).c_str(), std::string(tcmd.args[1]).c_str());
+		} else {
+			Serial << F("# Error: ") << std::string(tcmd.path) << F(" requires either 0 or 2 arguments: ssid, secret\n");
+		}
+#endif
 	} else {
-		Serial << "# Unrecognized command: '" << tcmd.path << "'; try 'help'.\n";
+		Serial << F("# Unrecognized command: '") << tcmd.path << F("'; try 'help'.\n");
 	}
 }
 
