@@ -533,8 +533,8 @@ void setup() {
 	Serial << "# Resetting timer at " << currentTickTime << "\n";
 	theTimer->reset(currentTickTime);
 
-#ifdef TAA_RELAYTIMER_WIFINET0_SSID
-	wifiNetworks.emplace_back(TAA_RELAYTIMER_WIFINET0_SSID, TAA_RELAYTIMER_WIFINET0_PASSWORD);
+#ifdef TOGOSARDUINOAPPS2021_WIFINET0_SSID
+	wifiNetworks.emplace_back(TOGOSARDUINOAPPS2021_WIFINET0_SSID, TOGOSARDUINOAPPS2021_WIFINET0_PASSWORD);
 #endif
 }
 

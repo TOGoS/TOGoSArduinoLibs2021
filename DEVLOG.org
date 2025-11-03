@@ -479,4 +479,13 @@ anyway, and discounting the rubber band) into one of my phone holders.
 - Switch to 'real version number' for core (i.e. RelayTimer.ino)
   - Can start at v3.0 maybe, since there is a ~apps/instances/2025/20250310-plant-light-timer/v2.1~ tag.
 
-*** TODO Connect to network and broadcast status in HELO packets, similar to ES2021
+*** DONE Connect to network and broadcast status in HELO packets, similar to ES2021
+
+See my personal instance confuguration, b9e021efa8bfdad69c10b9bebca749306a0fcce2.
+
+One little improvement I am thinking could be made is to have standard
+(across all apps) names for the hardcoded WiFi network constants so
+that a single ~secrets-....h~ (or possibly different ones for
+different features; ~wifi-secrets-...h~, ~mqtt-secrets...h~, etc)
+could be used across the apps without having to rename stuff
+and make new header files.
