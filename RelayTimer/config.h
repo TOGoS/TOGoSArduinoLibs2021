@@ -10,7 +10,7 @@
 // This way you can track which exact secrets were used without actually committing their content.
 // 
 // e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 is the empty file.
-#include "secrets-e69de29bb2d1d6434b8b29ae775ad8c2e48c5391.h"
+#include "wifi-secrets-16776e8ce501720624bd7b0252a319b56b2b366c.h"
 
 #define TAA_RELAYTIMER_WIFI_ENABLED
 
