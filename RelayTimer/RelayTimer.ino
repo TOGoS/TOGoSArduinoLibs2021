@@ -20,6 +20,7 @@
 #include <TOGoS/Command/TLIBuffer.h>
 #include <TOGoS/Command/TokenizedCommand.h>
 #include <TOGoSStreamOperators.h>
+#include <TOGoSBufferPrint.h>
 
 namespace TOGoS::Arduino::RelayTimer {
 	//// Some generic stuff that might be moved to a library
@@ -83,8 +84,13 @@ namespace TOGoS::Arduino::RelayTimer {
 	
 	template <int pin, bool activeLow>
 	class Relay {
+		bool active;
 	public:
+		boolean get() const {
+			return this->active;
+		}
 		void set(bool on) {
+			this->active = on;
 			digitalWrite(pin, (on ^ activeLow) ? HIGH : LOW);
 		}
 	};
@@ -256,13 +262,37 @@ const char *formatBool(int boolish) {
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
 #include "config.h"
 
+using TLIBuffer = TOGoS::Command::TLIBuffer;
+using TokenizedCommand = TOGoS::Command::TokenizedCommand;
+using SBInputEvent = TOGoS::Arduino::RelayTimer::SBInputEvent;
+
+TOGoS::Arduino::RelayTimer::Timer *theTimer =
+	appConfig.timerMode == TOGoS::Arduino::RelayTimer::TimerMode::ONE_SHOT ? (TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::OneShotTimer(
+		appConfig.oneShotConfig.shortPressTimerIncrement
+	) :
+	(TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::LoopTimer(
+		appConfig.loopingConfig.onDuration,
+		appConfig.loopingConfig.loopDuration
+	);
+
+std::optional<long> buttonDownTime = {};
+unsigned long currentTickTime = 0;
+std::optional<bool> previousRelayState = false;
+
+TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
+TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
+
+
 //// WiFi stuff
+
+void updateHelo(long currentTime, boolean forceUpdate);
 
 #ifdef TAA_RELAYTIMER_WIFI_ENABLED
 
 // Copied from EnvironmentalSensor2021
 
 #include <ESP8266WiFi.h>
+#include <WiFiUdp.h>
 
 // TODO: Maybe these should come from appConfig?
 const char *myHostname = NULL; // "relaytimer";
@@ -302,29 +332,47 @@ void emitWifiProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
 	dest.accept("auto-reconnect", formatBool(WiFi.getAutoReconnect()));
 }
 
+long lastHeloBroadcast = -1;
+WiFiUDP udp;
+
+void updateHelo(long currentTime, boolean forceUpdate) {
+	if( currentTime - lastHeloBroadcast < 10000 && !forceUpdate ) return;
+	
+	byte macAddressBuffer[6];
+	WiFi.macAddress(macAddressBuffer);
+   
+	char buf[1024];
+	TOGoS::BufferPrint bufPrn(buf, sizeof(buf));
+   
+	//bufPrn << "#HELO //" << macAddressToHex(macAddressBuffer, "-") << "/\n";
+	bufPrn << "#HELO\n";
+	bufPrn << "\n";
+	// TODO: Use the PropConsumer to do all this so it can be shared
+	bufPrn << "app-name " << appConfig.appName << "\n";
+	bufPrn << "app-version " << appConfig.appVersion << "\n";
+	bufPrn << "source-ref " << appConfig.sourceRef << "\n";
+	bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
+	bufPrn << "clock " << currentTime << "\n";
+	bufPrn << "touch-button/pressed " << theButton.isPressed() << "\n";
+	bufPrn << "relay/state " << (theRelay.get() ? "on" : "off") << "\n";
+	
+	const char *broadcastAddr = "ff02::1";
+	Serial << "# Broadcasting a HELO packet to [" << broadcastAddr << "]:" << myUdpPort << "\n";
+	
+	udp.beginPacket(broadcastAddr, myUdpPort);
+	udp.write(buf, bufPrn.size());
+	udp.endPacket();
+	
+	lastHeloBroadcast = currentTime;
+}
+
+#else
+
+void updateHelo(long currentTime, boolean forceUpdate) { }
+
 #endif
 
 //// End WiFi stuff
-
-using TLIBuffer = TOGoS::Command::TLIBuffer;
-using TokenizedCommand = TOGoS::Command::TokenizedCommand;
-using SBInputEvent = TOGoS::Arduino::RelayTimer::SBInputEvent;
-
-TOGoS::Arduino::RelayTimer::Timer *theTimer =
-	appConfig.timerMode == TOGoS::Arduino::RelayTimer::TimerMode::ONE_SHOT ? (TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::OneShotTimer(
-		appConfig.oneShotConfig.shortPressTimerIncrement
-	) :
-	(TOGoS::Arduino::RelayTimer::Timer *) new TOGoS::Arduino::RelayTimer::LoopTimer(
-		appConfig.loopingConfig.onDuration,
-		appConfig.loopingConfig.loopDuration
-	);
-
-std::optional<long> buttonDownTime = {};
-unsigned long currentTickTime = 0;
-std::optional<bool> previousRelayState = false;
-
-TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
-TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActiveLow> theButton;
 
 void printHelp() {
 	Serial << "# Welcome to " << appConfig.appName << "\n";
@@ -377,6 +425,12 @@ void printInfo() {
 	Serial << "# Timer:\n";
 	theTimer->emitProps(infoPropEmitter);
 	// Serial << "#  name = \"" << theTimer->getName() << "\"\n";
+	
+	Serial << "# Button:\n";
+	Serial << "#  pressed = " << formatBool(theButton.isPressed()) << "\n";
+	Serial << "# Relay:\n";
+	Serial << "#  state = " << (theRelay.get() ? "on" : "off") << "\n";
+	
 }
 
 TLIBuffer commandBuffer;
@@ -468,10 +522,12 @@ void loop() {
 	
 	digitalWrite(LED_BUILTIN, theTimer->isIndicatorOnAt(currentTickTime) ? LOW : HIGH);
 	bool shouldRelayBeOn = theTimer->isRelayOnAt(currentTickTime);
+	bool shouldForceHeloUpdate = false;
 	if( !previousRelayState.has_value() || shouldRelayBeOn != *previousRelayState ) {
 		Serial << "# Switching relay " << (shouldRelayBeOn ? "on" : "off") << "\n";
 		theRelay.set(shouldRelayBeOn);
 		previousRelayState = shouldRelayBeOn;
+		shouldForceHeloUpdate = true;
 	}
 	while( Serial.available() > 0 ) {
 		TLIBuffer::BufferState bufState = commandBuffer.onChar(Serial.read());
@@ -480,5 +536,6 @@ void loop() {
 			commandBuffer.reset();
 		}
 	}
+	updateHelo(currentTickTime, shouldForceHeloUpdate);
 	delay(10);
 }
