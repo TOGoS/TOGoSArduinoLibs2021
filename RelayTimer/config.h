@@ -6,19 +6,16 @@
 #include <TOGoS/PreprocFun/ConfigHash.h>
 
 // When you create a secrets file, use `git hash-object` to name it,
-// then change this to reflect that hash.
+// then change this #include to reflect that hash, and commit the changes to this file.
+// This way you can track which exact secrets were used without actually committing their content.
+// 
 // e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 is the empty file.
-#define TAA_RELAYTIMER_SECRETS_FILE_HASH e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+#include "secrets-e69de29bb2d1d6434b8b29ae775ad8c2e48c5391.h"
 
 #define TAA_RELAYTIMER_WIFI_ENABLED
 
 #include "version.h"
 #include "commit-hash.h"
-
-#ifdef TAA_RELAYTIMER_SECRETS_FILE_HASH
-#define TAA_RELAYTIMER_SECRETS_INCLUDESPEC TOGOSARDUINOAPPS2021_CONFIG_HASH_TO_INCLUDESPEC(secrets,TAA_RELAYTIMER_SECRETS_FILE_HASH)
-#include TAA_RELAYTIMER_SECRETS_INCLUDESPEC
-#endif
 
 constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.appName = "RelayTimer",
