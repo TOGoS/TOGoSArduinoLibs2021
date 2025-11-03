@@ -11,7 +11,7 @@
 // Requires TOGoSArduinoLibs 56c698e86a76a9cafb81a923b8d2044f01ad5d90
 // (whatever versions of individual libraries that entails)
 
-#define TAA_RELAYTIMER_COARSE_VERSION "3.0.11"
+#define TAA_RELAYTIMER_COARSE_VERSION "3.0.13"
 
 #include <optional>
 
@@ -212,7 +212,7 @@ namespace TOGoS::Arduino::RelayTimer {
 
 void TOGoS::Arduino::RelayTimer::AppConfig::emitProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) const {
 	dest.accept("appName"          , appName          );
-	dest.accept("sourceRef"        , appVersion       );
+	dest.accept("appVersion"       , appVersion       );
 	dest.accept("relayControlPin"  , relayControlPin  );
 	dest.accept("relayIsActiveLow" , relayIsActiveLow );
 	dest.accept("buttonPin"        , buttonPin        );

@@ -20,6 +20,8 @@
 
 constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.appName = "RelayTimer",
+	// Since this config.h is included in the repo,
+	// its commit hash will transitively include TAA_RELAYTIMER_SECRETS_FILE_HASH.
 	.appVersion = "v" TAA_RELAYTIMER_COARSE_VERSION "-" TAA_RELAYTIMER_COMMIT_HASH,
 	.relayControlPin = D1,
 	.relayIsActiveLow = true,
