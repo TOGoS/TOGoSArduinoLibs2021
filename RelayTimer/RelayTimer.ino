@@ -458,7 +458,7 @@ void printInfo() {
 #ifdef TAA_RELAYTIMER_WIFI_ENABLED
 	Serial << "# WiFi:\n";
 	// TODO: It probably wouldn't hurt to just print out the SSIDs.
-	Serial << "#  hardcoded-network-count " << wifiNetworks.size() << "\n";
+	Serial << "#  hardcoded-network-count = " << wifiNetworks.size() << "\n";
 	emitWifiProps(infoPropEmitter);
 #endif
 	
