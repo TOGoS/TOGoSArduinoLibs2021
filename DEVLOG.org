@@ -481,7 +481,7 @@ anyway, and discounting the rubber band) into one of my phone holders.
 
 *** DONE Connect to network and broadcast status in HELO packets, similar to ES2021
 
-See my personal instance confuguration, b9e021efa8bfdad69c10b9bebca749306a0fcce2.
+See my personal instance configuration, ~x-git-object:b9e021efa8bfdad69c10b9bebca749306a0fcce2#RelayTimer/RelayTimer.ino~.
 
 One little improvement I am thinking could be made is to have standard
 (across all apps) names for the hardcoded WiFi network constants so
@@ -489,3 +489,7 @@ that a single ~secrets-....h~ (or possibly different ones for
 different features; ~wifi-secrets-...h~, ~mqtt-secrets...h~, etc)
 could be used across the apps without having to rename stuff
 and make new header files.
+
+*** DONE Make that improvement
+
+My updated personal configuration is now ~x-git-object:010962aaa7415c4b3ffee48ebe0aecad59bb21fa#RelayTimer/RelayTimer.ino~.
