@@ -294,6 +294,12 @@ void updateHelo(long currentTime, boolean forceUpdate);
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 
+struct WiFiCredz {
+  const char *ssid;
+  const char *password;
+  WiFiCredz(const char *ssid, const char *password) : ssid(ssid), password(password) {}
+};
+
 // TODO: Maybe these should come from appConfig?
 const char *myHostname = NULL; // "relaytimer";
 bool useStaticIp4 = true;
@@ -301,6 +307,10 @@ const byte myIp4[] = {10, 9, 254, 254};
 const byte myIp4Gateway[] = {10, 9, 254, 254};
 const byte myIp4Subnet[] = {255, 255, 255, 255};
 const int myUdpPort = 16378;
+
+std::vector<WiFiCredz> wifiNetworks;
+int wifiNetworkIndex = -1;
+unsigned long lastWifiReconnectAttempt = 0;
 
 void configureWifi(ESP8266WiFiClass &wifi);
 
@@ -319,6 +329,34 @@ void configureWifi(ESP8266WiFiClass &wifi) {
 		wifi.hostname(myHostname); // This needs to come after `config`
 	}
 	Serial << F("# configureWifi: done\n");
+}
+
+void updateWifi(unsigned long currentTime) {
+	int status = WiFi.status();
+	if( status == WL_CONNECTED || status == WL_IDLE_STATUS ) return;
+	if( currentTime - lastWifiReconnectAttempt < 5000 ) return;
+	
+	Serial << F("# wifiUpdate: not connected; time to attempt [re]connect\n");
+	if( wifiNetworks.size() == 0 ) {
+		// Try to auto-connect to whatever's in memory
+		Serial << F("# No WiFi networks configured; attempting auto-connect to previous network...\n");
+		configureWifi(WiFi);
+		WiFi.begin();
+	} else {
+		Serial << F("# wifiUpdate: ") << wifiNetworks.size() << F(" networks configured\n");
+		++wifiNetworkIndex;
+		if( wifiNetworkIndex >= wifiNetworks.size() ) {
+			wifiNetworkIndex = 0;
+		}
+		
+		const WiFiCredz &credz = wifiNetworks[wifiNetworkIndex];
+		Serial << "# Attempting auto-connect to " << credz.ssid << "...\n";
+		configureWifi(WiFi);
+		WiFi.begin(credz.ssid, credz.password);
+	}
+	
+	lastWifiReconnectAttempt = currentTime;
+	Serial << "# wifiUpdate: done\n";
 }
 
 void emitWifiProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
@@ -419,6 +457,8 @@ void printInfo() {
 	
 #ifdef TAA_RELAYTIMER_WIFI_ENABLED
 	Serial << "# WiFi:\n";
+	// TODO: It probably wouldn't hurt to just print out the SSIDs.
+	Serial << "#  hardcoded-network-count " << wifiNetworks.size() << "\n";
 	emitWifiProps(infoPropEmitter);
 #endif
 	
@@ -430,7 +470,6 @@ void printInfo() {
 	Serial << "#  pressed = " << formatBool(theButton.isPressed()) << "\n";
 	Serial << "# Relay:\n";
 	Serial << "#  state = " << (theRelay.get() ? "on" : "off") << "\n";
-	
 }
 
 TLIBuffer commandBuffer;
@@ -493,6 +532,10 @@ void setup() {
 	currentTickTime = millis();
 	Serial << "# Resetting timer at " << currentTickTime << "\n";
 	theTimer->reset(currentTickTime);
+
+#ifdef TAA_RELAYTIMER_WIFINET0_SSID
+	wifiNetworks.emplace_back(TAA_RELAYTIMER_WIFINET0_SSID, TAA_RELAYTIMER_WIFINET0_PASSWORD);
+#endif
 }
 
 void loop() {
@@ -536,6 +579,7 @@ void loop() {
 			commandBuffer.reset();
 		}
 	}
+	updateWifi(currentTickTime);
 	updateHelo(currentTickTime, shouldForceHeloUpdate);
 	delay(10);
 }
