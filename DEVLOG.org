@@ -470,7 +470,7 @@ anyway, and discounting the rubber band) into one of my phone holders.
 ** 2025-11-01 - RelayTimer updates
 
 *** DONE Make timer durations configurable
-*** TODO Update configuration system
+*** DONE Update configuration system
 
 - Should need minimal and obvious changes to create instance from trunk
 - Include config.h in repo
