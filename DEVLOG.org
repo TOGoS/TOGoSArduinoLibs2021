@@ -22,21 +22,20 @@ are all in totally different places!
 [[https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/][This guide]] might be good.
 Note that you can mess up boot by connecting D3, D5, or TX to low or D8 to high
 
-| Label | GPIO   | Input        | Output        | Notes                                                         |
-|-------+--------+--------------+---------------+---------------------------------------------------------------|
-| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                    |
-| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C)                                       |
-| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                       |
-| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW           |
-| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW            |
-| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                    |
-| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                    |
-| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                    |
-| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                           |
-| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                  |
-| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW |
-| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                    |
-
+| Label | GPIO   | Input        | Output        | Notes                                                                     |
+|-------+--------+--------------+---------------+---------------------------------------------------------------------------|
+| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                                |
+| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C), default (active high) pin for [[https://www.wemos.cc/en/latest/d1_mini_shield/relay.html][WeMos relay shield]] |
+| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                                   |
+| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW                       |
+| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW                        |
+| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                                |
+| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                                |
+| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                                |
+| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                                       |
+| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                              |
+| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW             |
+| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                                |
 
 ** 2025-06-10 - HELODemo - IPv6 on ESP8266 research
 
