@@ -375,6 +375,11 @@ WiFiUDP udp;
 
 void updateHelo(long currentTime, boolean forceUpdate) {
 	if( currentTime - lastHeloBroadcast < 10000 && !forceUpdate ) return;
+	if( !udp.available() ) {
+		Serial << "# udp not available; skipping updateHelo\n";
+		lastHeloBroadcast = currentTime; // So as not to spam Serial output
+		return;
+	}
 	
 	byte macAddressBuffer[6];
 	WiFi.macAddress(macAddressBuffer);
@@ -397,10 +402,14 @@ void updateHelo(long currentTime, boolean forceUpdate) {
 	const char *broadcastAddr = "ff02::1";
 	Serial << "# Broadcasting a HELO packet to [" << broadcastAddr << "]:" << myUdpPort << "\n";
 	
+	Serial << "# udp.beginPacket(\"" << broadcastAddr << "\", " << myUdpPort << ");\n";
 	udp.beginPacket(broadcastAddr, myUdpPort);
+	Serial << "# udp.write(buf, " << bufPrn.size() << ");\n";
 	udp.write(buf, bufPrn.size());
+	Serial << "# udp.endPacket();\n";
 	udp.endPacket();
 	
+	Serial << "# lastHeloBroadcast = " << currentTime << "\n";
 	lastHeloBroadcast = currentTime;
 }
 
