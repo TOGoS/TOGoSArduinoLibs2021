@@ -24,17 +24,17 @@ constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
 	.appVersion = "v" TAA_RELAYTIMER_COARSE_VERSION,
 	.sourceRef = "x-git-object:" TAA_RELAYTIMER_COMMIT_HASH "#RelayTimer/RelayTimer.ino",
 	.relayControlPin = D1,
-	.relayIsActiveLow = true,
+	.relayIsActiveLow = false,
 	.buttonPin = D7,
 	.buttonIsActiveLow = true,
 	// ONE_SHOT or LOOPING
-	.timerMode = TOGoS::Arduino::RelayTimer::ONE_SHOT,
-	.oneShotConfig {
-		//
-		.shortPressTimerIncrement = 1000*3600
-	},
-	//	.loopingConfig {
-	//	.onDuration = 100,
-	//	.loopDuration = 1000*3600*24,
-	//}
+	.timerMode = TOGoS::Arduino::RelayTimer::LOOPING,
+	//.oneShotConfig {
+	//	//
+	//	.shortPressTimerIncrement = 1000*3600
+	//},
+	.loopingConfig {
+		.onDuration = 2000,
+		.loopDuration = 5000,
+	}
 };
