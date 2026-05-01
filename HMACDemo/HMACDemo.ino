@@ -24,6 +24,11 @@ void hmacSha1(const uint8_t *key, size_t keyLen, const uint8_t *message, size_t 
 	// The built-in SHA1 function
 	// can only do a whole dang message!
 	// So I guess we allocate a giant buffer...
+	// 
+	// TODO: Variant for case where message happens to have a hashSize buffer before it!
+	// 
+	// TODO: Alternatively, implement SHA-1 that can be given chunks.
+	// Could base this on https://github.com/TOGoS/TSHash/blob/master/src/main/ts/tshash/SHA1.ts.
 	const size_t hmacBufLen = 1536;
 	uint8_t hmacBuf[hmacBufLen]; // Holds iKeyPad ++ message
 	
