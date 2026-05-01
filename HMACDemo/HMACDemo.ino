@@ -19,14 +19,14 @@ std::string toHex(const uint8_t *data, size_t len) {
   return hecks;
 }
 
-// The built-in SHA1 function
-// can only do a whole dang message!
-// So I guess we allocate a giant buffer...
-const size_t hmacBufLen = 1536;
-uint8_t hmacBuf[hmacBufLen]; // Holds iKeyPad ++ message
-
 // Based on pseudocode from https://en.wikipedia.org/wiki/HMAC
 void hmacSha1(const uint8_t *key, size_t keyLen, const uint8_t *message, size_t messageLen, uint8_t *dest) {
+	// The built-in SHA1 function
+	// can only do a whole dang message!
+	// So I guess we allocate a giant buffer...
+	const size_t hmacBufLen = 1536;
+	uint8_t hmacBuf[hmacBufLen]; // Holds iKeyPad ++ message
+	
 	const size_t blockSize = 64;
 	const size_t hashSize = 20;
 	size_t padPlusMessageLen = blockSize + messageLen;
