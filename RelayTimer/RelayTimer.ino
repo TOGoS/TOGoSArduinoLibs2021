@@ -11,7 +11,7 @@
 // Requires TOGoSArduinoLibs 56c698e86a76a9cafb81a923b8d2044f01ad5d90
 // (whatever versions of individual libraries that entails)
 
-#define TAA_RELAYTIMER_COARSE_VERSION "3.0.19-dev"
+#define TAA_RELAYTIMER_COARSE_VERSION "3.0.21-dev"
 
 #include <optional>
 
@@ -285,7 +285,7 @@ TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActive
 
 //// WiFi stuff
 
-void updateHelo(long currentTime, boolean forceUpdate);
+void updateHeloBroadcast(long currentTime, boolean forceUpdate);
 
 #ifdef TAA_RELAYTIMER_WIFI_ENABLED
 
@@ -373,13 +373,8 @@ void emitWifiProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
 long lastHeloBroadcast = -1;
 WiFiUDP udp;
 
-void updateHelo(long currentTime, boolean forceUpdate) {
+void updateHeloBroadcast(long currentTime, boolean forceUpdate) {
 	if( currentTime - lastHeloBroadcast < 10000 && !forceUpdate ) return;
-	if( !udp.available() ) {
-		Serial << "# udp not available; skipping updateHelo\n";
-		lastHeloBroadcast = currentTime; // So as not to spam Serial output
-		return;
-	}
 	
 	byte macAddressBuffer[6];
 	WiFi.macAddress(macAddressBuffer);
@@ -415,7 +410,7 @@ void updateHelo(long currentTime, boolean forceUpdate) {
 
 #else
 
-void updateHelo(long currentTime, boolean forceUpdate) { }
+void updateHeloBroadcast(long currentTime, boolean forceUpdate) { }
 
 #endif
 
@@ -589,6 +584,6 @@ void loop() {
 		}
 	}
 	updateWifi(currentTickTime);
-	updateHelo(currentTickTime, shouldForceHeloUpdate);
+	updateHeloBroadcast(currentTickTime, shouldForceHeloUpdate);
 	delay(10);
 }
