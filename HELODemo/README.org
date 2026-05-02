@@ -1,0 +1,16 @@
+#+TITLE: HELODemo
+
+** UDPListen.ts
+
+A Deno script to listen for UDP packets and print out some metadata
+and their content, indented a bit.
+
+#+BEGIN_SRC sh
+deno run --unstable-net --allow-net UDPListen.ts
+#+END_SRC
+
+For an older version of Deno, ~--unstable~ instead of ~--unstable-net~:
+
+#+BEGIN_SRC sh
+deno run --unstable --allow-net UDPListen.ts
+#+END_SRC

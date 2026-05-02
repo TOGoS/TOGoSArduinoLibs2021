@@ -11,8 +11,8 @@ let port = 16378;
 
 for( const arg of Deno.args ) {
 	let m : RegExpExecArray|null;
-	if( (m = /^(?:\[(?<hostname>[^\]]+)\]|(?<hostname>[^\[\]:]+)):(?<port>\d+)$/.exec(arg)) != null ) {
-		hostname = m.groups!['hostname'];
+	if( (m = /^(?:\[(?<bracketedHostname>[^\]]+)\]|(?<hostname>[^\[\]:]+)):(?<port>\d+)$/.exec(arg)) != null ) {
+		hostname = m.groups!['bracketedHostname'] || m.groups!['hostname'];
 		port = +m.groups!['port'];
 	} else if( (m = /^(\d+)$/.exec(arg)) != null ) {
 		port = +m[1];
@@ -30,5 +30,11 @@ const listener = Deno.listenDatagram({
 });
 while( true ) {
 	const [data, sourceAddr] = await listener.receive();
-	console.log(`Received ${data.length} bytes from ${JSON.stringify(sourceAddr)}: ${uint8ArrayToHex(data)}`);
+	let text;
+	try {
+		text = "text:\n\t" + new TextDecoder().decode(data).replaceAll("\n","\n\t");
+	} catch( e ) {
+		text = "hex: " + uint8ArrayToHex(data);
+	}
+	console.log(`Received ${data.length} bytes from ${JSON.stringify(sourceAddr)}: ${text}`);
 }
