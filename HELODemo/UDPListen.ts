@@ -11,8 +11,8 @@ let port = 16378;
 
 for( const arg of Deno.args ) {
 	let m : RegExpExecArray|null;
-	if( (m = /^(?:\[(?<hostname>[^\]]+)\]|(?<hostname>[^\[\]:]+)):(?<port>\d+)$/.exec(arg)) != null ) {
-		hostname = m.groups!['hostname'];
+	if( (m = /^(?:\[(?<bracketedHostname>[^\]]+)\]|(?<hostname>[^\[\]:]+)):(?<port>\d+)$/.exec(arg)) != null ) {
+		hostname = m.groups!['bracketedHostname'] || m.groups!['hostname'];
 		port = +m.groups!['port'];
 	} else if( (m = /^(\d+)$/.exec(arg)) != null ) {
 		port = +m[1];
