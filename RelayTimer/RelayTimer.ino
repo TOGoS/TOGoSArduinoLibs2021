@@ -11,7 +11,7 @@
 // Requires TOGoSArduinoLibs 56c698e86a76a9cafb81a923b8d2044f01ad5d90
 // (whatever versions of individual libraries that entails)
 
-#define TAA_RELAYTIMER_COARSE_VERSION "3.0.21-dev"
+#define TAA_RELAYTIMER_COARSE_VERSION "3.0.23-dev"
 
 #include <optional>
 
@@ -257,6 +257,14 @@ const char *formatBool(int boolish) {
 	return boolish ? "true" : "false";
 }
 
+const char *onOffStr(bool reg) {
+	return reg ? "on" : "off";
+}
+
+const char *onOffAutoStr(std::optional<bool> reg) {
+	return !reg.has_value() ? "auto" : *reg ? "on" : "off";
+}
+
 ////
 
 // config.h should declare a `constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig`:
@@ -277,6 +285,7 @@ TOGoS::Arduino::RelayTimer::Timer *theTimer =
 
 std::optional<long> buttonDownTime = {};
 unsigned long currentTickTime = 0;
+std::optional<bool> helloRelayStateOverride = {};
 std::optional<bool> previousRelayState = false;
 
 TOGoS::Arduino::RelayTimer::Relay<appConfig.relayControlPin, appConfig.relayIsActiveLow> theRelay;
@@ -286,6 +295,7 @@ TOGoS::Arduino::RelayTimer::Button<appConfig.buttonPin, appConfig.buttonIsActive
 //// WiFi stuff
 
 void updateHeloBroadcast(long currentTime, boolean forceUpdate);
+void updateHeloListen();
 
 #ifdef TAA_RELAYTIMER_WIFI_ENABLED
 
@@ -374,15 +384,15 @@ void emitWifiProps(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
 	dest.accept("auto-reconnect", formatBool(WiFi.getAutoReconnect()));
 }
 
+int broadcastVerbosity = 0;
 long lastHeloBroadcast = -1;
 WiFiUDP udp;
+bool udpInitialized;
 
 void updateHeloBroadcast(long currentTime, boolean forceUpdate) {
 	if( currentTime - lastHeloBroadcast < 10000 && !forceUpdate ) return;
-	if( !isWiFiConnected() ) {
-		// Otherwise this crashes at udp.beginPacket().
-		// Which is odd -- why didn't ES2021 run into that problem?
-		Serial << "# udp not available; skipping updateHelo\n";
+	if( !udpInitialized ) {
+		if( broadcastVerbosity >= 200 ) Serial << "# UDP not initialized; skipping updateHelo\n";
 		lastHeloBroadcast = currentTime; // So as not to spam Serial output
 		return;
 	}
@@ -403,25 +413,50 @@ void updateHeloBroadcast(long currentTime, boolean forceUpdate) {
 	bufPrn << "mac " << macAddressToHex(macAddressBuffer, ":") << "\n";
 	bufPrn << "clock " << currentTime << "\n";
 	bufPrn << "touch-button/pressed " << theButton.isPressed() << "\n";
+	bufPrn << "relay/state/helo-override " << onOffAutoStr(helloRelayStateOverride) << "\n";
 	bufPrn << "relay/state " << (theRelay.get() ? "on" : "off") << "\n";
 	
 	const char *broadcastAddr = "ff02::1";
-	Serial << "# Broadcasting a HELO packet to [" << broadcastAddr << "]:" << myUdpPort << "\n";
+	if( broadcastVerbosity >= 100 ) Serial << "# Broadcasting a HELO packet to [" << broadcastAddr << "]:" << myUdpPort << "\n";
 	
-	Serial << "# udp.beginPacket(\"" << broadcastAddr << "\", " << myUdpPort << ");\n";
+	if( broadcastVerbosity >= 200 ) Serial << "# udp.beginPacket(\"" << broadcastAddr << "\", " << myUdpPort << ");\n";
 	udp.beginPacket(broadcastAddr, myUdpPort);
-	Serial << "# udp.write(buf, " << bufPrn.size() << ");\n";
+	if( broadcastVerbosity >= 200 ) Serial << "# udp.write(buf, " << bufPrn.size() << ");\n";
 	udp.write(buf, bufPrn.size());
-	Serial << "# udp.endPacket();\n";
+	if( broadcastVerbosity >= 200 ) Serial << "# udp.endPacket();\n";
 	udp.endPacket();
 	
-	Serial << "# lastHeloBroadcast = " << currentTime << "\n";
+	if( broadcastVerbosity >= 200 ) Serial << "# lastHeloBroadcast = " << currentTime << "\n";
 	lastHeloBroadcast = currentTime;
+}
+
+void updateHeloListen() {
+	size_t len = udp.parsePacket();
+	if( len == 0 ) return;
+	
+	Serial << "# Received " << len << "-byte UDP packet...";
+#ifdef TAA_RELAYTIMER_HELO_OVERRIDE_ENABLED
+	if( len == 27 ) { // "#HELO/PUT /relay/state\n\non\n"
+		Serial << "which means 'on'!\n";
+		helloRelayStateOverride = true;
+	} else if( len == 28 ) { // "#HELO/PUT /relay/state\n\noff\n"
+		Serial << "which means 'off'!\n";
+		helloRelayStateOverride = false;
+	} else if( len == 29 ) { // "#HELO/PUT /relay/state\n\nauto\n"
+		Serial << "which means 'auto'!\n";
+		helloRelayStateOverride = {};
+	} else {
+		Serial << "which means nothing to me; ignoring!\n";
+	}
+#else
+	Serial << "but TAA_RELAYTIMER_HELO_OVERRIDE_ENABLED is not set, so I'm ignoring it.\n";
+#endif
 }
 
 #else
 
 void updateHeloBroadcast(long currentTime, boolean forceUpdate) { }
+void updateHeloListen() { }
 
 #endif
 
@@ -455,6 +490,20 @@ void emitPinConstants(TOGoS::Arduino::RelayTimer::PropConsumer &dest) {
 	dest.accept("D7", D7);
 	dest.accept("D8", D8);
 	dest.accept("LED_BUILTIN", LED_BUILTIN);
+	dest.accept("TAA_RELAYTIMER_WIFI_ENABLED",
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
+		"(defined)"
+#else
+		"(not defined)"
+#endif
+   );
+	dest.accept("TAA_RELAYTIMER_HELO_OVERRIDE_ENABLED",
+#ifdef TAA_RELAYTIMER_HELO_OVERRIDE_ENABLED
+		"(defined)"
+#else
+		"(not defined)"
+#endif
+   );
 }
 
 void printInfo() {
@@ -484,7 +533,9 @@ void printInfo() {
 	Serial << "# Button:\n";
 	Serial << "#  pressed = " << formatBool(theButton.isPressed()) << "\n";
 	Serial << "# Relay:\n";
-	Serial << "#  state = " << (theRelay.get() ? "on" : "off") << "\n";
+	Serial << "#  state according to timer = " << onOffStr(theTimer->isRelayOnAt(currentTickTime)) << "\n";
+	Serial << "#  state accoding to HELO override = " << onOffAutoStr(helloRelayStateOverride) << "\n";
+	Serial << "#  state = " << onOffStr(theRelay.get()) << "\n";
 }
 
 TLIBuffer commandBuffer;
@@ -579,7 +630,9 @@ void loop() {
 	}
 	
 	digitalWrite(LED_BUILTIN, theTimer->isIndicatorOnAt(currentTickTime) ? LOW : HIGH);
-	bool shouldRelayBeOn = theTimer->isRelayOnAt(currentTickTime);
+	bool shouldRelayBeOn =
+		helloRelayStateOverride.has_value() ? *helloRelayStateOverride :
+		theTimer->isRelayOnAt(currentTickTime);
 	bool shouldForceHeloUpdate = false;
 	if( !previousRelayState.has_value() || shouldRelayBeOn != *previousRelayState ) {
 		Serial << "# Switching relay " << (shouldRelayBeOn ? "on" : "off") << "\n";
@@ -594,7 +647,21 @@ void loop() {
 			commandBuffer.reset();
 		}
 	}
+#ifdef TAA_RELAYTIMER_WIFI_ENABLED
 	updateWifi(currentTickTime);
-	updateHeloBroadcast(currentTickTime, shouldForceHeloUpdate);
+	
+	if( !udpInitialized && isWiFiConnected() ) {
+		// beginPacket() seems to crash if called before WiFi connected.
+		// Which is odd -- why didn't ES2021 run into that problem?
+		int stat = udp.begin(16378);
+		Serial << "# udp.begin(16378)... " << stat << "\n";
+		if( stat ) udpInitialized = true;
+	}
+	if( udpInitialized ) {
+		updateHeloBroadcast(currentTickTime, shouldForceHeloUpdate);
+		updateHeloListen();
+	}
+#endif
+	
 	delay(10);
 }
