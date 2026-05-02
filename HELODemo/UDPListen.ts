@@ -32,7 +32,7 @@ while( true ) {
 	const [data, sourceAddr] = await listener.receive();
 	let text;
 	try {
-		text = "text:\n  " + new TextDecoder().decode(data).replaceAll("\n","\n  ");
+		text = "text:\n\t" + new TextDecoder().decode(data).replaceAll("\n","\n\t");
 	} catch( e ) {
 		text = "hex: " + uint8ArrayToHex(data);
 	}
