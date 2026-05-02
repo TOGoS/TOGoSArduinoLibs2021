@@ -331,6 +331,10 @@ void configureWifi(ESP8266WiFiClass &wifi) {
 	Serial << F("# configureWifi: done\n");
 }
 
+bool isWiFiConnected() {
+	return WiFi.status() == WL_CONNECTED;
+}
+
 void updateWifi(unsigned long currentTime) {
 	int status = WiFi.status();
 	if( status == WL_CONNECTED || status == WL_IDLE_STATUS ) return;
@@ -375,7 +379,14 @@ WiFiUDP udp;
 
 void updateHeloBroadcast(long currentTime, boolean forceUpdate) {
 	if( currentTime - lastHeloBroadcast < 10000 && !forceUpdate ) return;
-	
+	if( !isWiFiConnected() ) {
+		// Otherwise this crashes at udp.beginPacket().
+		// Which is odd -- why didn't ES2021 run into that problem?
+		Serial << "# udp not available; skipping updateHelo\n";
+		lastHeloBroadcast = currentTime; // So as not to spam Serial output
+		return;
+	}
+
 	byte macAddressBuffer[6];
 	WiFi.macAddress(macAddressBuffer);
    
