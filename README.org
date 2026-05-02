@@ -23,3 +23,24 @@ Or maybe to update them to the new conventions and import them.
 - ArduinoLightController
 - ArduinoLEDAnimator2021
 - ArduinoChargeController
+
+** Cross-app standards
+
+Secrets can be stored, not checked into the Git repo, in ~secrets-GITOBJECTHASH.h~ files,
+and referenced by ~config.h~ files, which are checked in on 'instance' branches.
+
+This way the exact configuration, including a hash of the secrets file,
+can be reported by the app without exposing the contents of the secrets.
+
+*** Standard secret constants
+
+To indicate hardcoded WiFi networks that should be periodically auto-[re]connected-to:
+
+#+begin_src
+#define TOGOSARDUINOAPPS2021_WIFINET0_SSID "MyNetworkSSID"
+#define TOGOSARDUINOAPPS2021_WIFINET0_PASSWORD "My network passowrd goes here."
+#+end_src
+
+More than one WiFi network can be listed, by incrementing the number in each one.
+Apps may or may not look at them all.
+(I may declare an expected number of supported networks later.)

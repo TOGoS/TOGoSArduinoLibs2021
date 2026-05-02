@@ -22,21 +22,20 @@ are all in totally different places!
 [[https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/][This guide]] might be good.
 Note that you can mess up boot by connecting D3, D5, or TX to low or D8 to high
 
-| Label | GPIO   | Input        | Output        | Notes                                                         |
-|-------+--------+--------------+---------------+---------------------------------------------------------------|
-| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                    |
-| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C)                                       |
-| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                       |
-| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW           |
-| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW            |
-| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                    |
-| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                    |
-| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                    |
-| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                           |
-| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                  |
-| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW |
-| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                    |
-
+| Label | GPIO   | Input        | Output        | Notes                                                                     |
+|-------+--------+--------------+---------------+---------------------------------------------------------------------------|
+| D0    | GPIO16 | no interrupt | no PWM or I2C | High at boot; used to wake from deep sleep                                |
+| D1    | GPIO5  | Ok           | Ok            | Often used as SCL (I2C), default (active high) pin for [[https://www.wemos.cc/en/latest/d1_mini_shield/relay.html][WeMos relay shield]] |
+| D2    | GPIO4  | Ok           | Ok            | Often used as SDA (I2C)                                                   |
+| D3    | GPIO0  | Pulled up    | Ok            | Connected to FLASH button, boot fails if pulled LOW                       |
+| D4    | GPIO2  | Pulled up    | Ok            | Connected to onboard LED, boot fails if pulled LOW                        |
+| D5    | GPIO14 | Ok           | Ok            | SPI (SCLK)                                                                |
+| D6    | GPIO12 | Ok           | Ok            | SPI (MISO)                                                                |
+| D7    | GPIO13 | Ok           | Ok            | SPI (MOSI)                                                                |
+| D8    | GPIO16 | Pulled down  | Ok-ish        | SPI (CS), boot fails if pulled HIGH                                       |
+| RX    | GPIO3  | Ok-ish       | NO!  RX pin   | HIGH at boot                                                              |
+| TX    | GPIO1  | NO! TX pin   | Ok            | HIGH at boot, debug output at boot, debug fails if pulled LOW             |
+| A0    | ADC0   | Ok; Analog   | NO!           | 0-1V = 0-1023, as I recall                                                |
 
 ** 2025-06-10 - HELODemo - IPv6 on ESP8266 research
 
@@ -466,3 +465,30 @@ a branch of sorts with hard-coded networks after all.
 
 Note: With the flat lid, this thing fits perfectly (thickness-wise,
 anyway, and discounting the rubber band) into one of my phone holders.
+
+** 2025-11-01 - RelayTimer updates
+
+*** DONE Make timer durations configurable
+*** DONE Update configuration system
+
+- Should need minimal and obvious changes to create instance from trunk
+- Include config.h in repo
+- Include 'empty' ~secrets-(whatever the hash is).h~ file, reference from config.h
+- .gitignore secrets files except for the empty one
+- Switch to 'real version number' for core (i.e. RelayTimer.ino)
+  - Can start at v3.0 maybe, since there is a ~apps/instances/2025/20250310-plant-light-timer/v2.1~ tag.
+
+*** DONE Connect to network and broadcast status in HELO packets, similar to ES2021
+
+See my personal instance configuration, ~x-git-object:b9e021efa8bfdad69c10b9bebca749306a0fcce2#RelayTimer/RelayTimer.ino~.
+
+One little improvement I am thinking could be made is to have standard
+(across all apps) names for the hardcoded WiFi network constants so
+that a single ~secrets-....h~ (or possibly different ones for
+different features; ~wifi-secrets-...h~, ~mqtt-secrets...h~, etc)
+could be used across the apps without having to rename stuff
+and make new header files.
+
+*** DONE Make that improvement
+
+My updated personal configuration is now ~x-git-object:010962aaa7415c4b3ffee48ebe0aecad59bb21fa#RelayTimer/RelayTimer.ino~.

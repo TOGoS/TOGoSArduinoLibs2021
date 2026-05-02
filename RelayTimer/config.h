@@ -1,0 +1,40 @@
+// D1 is used by https://www.wemos.cc/en/latest/d1_mini_shield/relay.html
+
+// TAA_RELAYTIMER_COARSE_VERSION should have been set by the main program
+
+#include <TOGoSPreprocFun.h>
+#include <TOGoS/PreprocFun/ConfigHash.h>
+
+// When you create a secrets file, use `git hash-object` to name it,
+// then change this #include to reflect that hash, and commit the changes to this file.
+// This way you can track which exact secrets were used without actually committing their content.
+// 
+// e69de29bb2d1d6434b8b29ae775ad8c2e48c5391 is the empty file.
+#include "secrets-e69de29bb2d1d6434b8b29ae775ad8c2e48c5391.h"
+
+#define TAA_RELAYTIMER_WIFI_ENABLED
+
+#include "version.h"
+#include "commit-hash.h"
+
+constexpr TOGoS::Arduino::RelayTimer::AppConfig appConfig = {
+	.appName = "RelayTimer",
+	// Since this config.h is included in the repo,
+	// its commit hash will transitively include TAA_RELAYTIMER_SECRETS_FILE_HASH.
+	.appVersion = "v" TAA_RELAYTIMER_COARSE_VERSION,
+	.sourceRef = "x-git-object:" TAA_RELAYTIMER_COMMIT_HASH "#RelayTimer/RelayTimer.ino",
+	.relayControlPin = D1,
+	.relayIsActiveLow = false,
+	.buttonPin = D7,
+	.buttonIsActiveLow = true,
+	// ONE_SHOT or LOOPING
+	.timerMode = TOGoS::Arduino::RelayTimer::LOOPING,
+	//.oneShotConfig {
+	//	//
+	//	.shortPressTimerIncrement = 1000*3600
+	//},
+	.loopingConfig {
+		.onDuration = 2000,
+		.loopDuration = 5000,
+	}
+};
